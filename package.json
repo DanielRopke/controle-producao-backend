@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "rc-slider": "^11.1.8",
+    "recharts": "^3.0.0"
+  }
+}
