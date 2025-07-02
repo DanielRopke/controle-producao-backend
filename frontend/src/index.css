@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Garante que o root ocupa toda a tela e bloqueia só a rolagem horizontal */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow-x: hidden; /* bloqueia rolagem horizontal global */
+  /* overflow-y: auto ou hidden não definido aqui para permitir rolagem vertical nas páginas */
+  font-family: system-ui, sans-serif;
+}
+
+/* Estilos para o botão Home com logo */
+.botao-home {
+  height: 48px;
+  background: white;
+  color: #16a34a;
+  padding: 0 1.25rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  box-shadow: 0 4px 6px rgb(0 0 0 / 0.1);
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.botao-home:hover {
+  background-color: #bbf7d0; /* Verde claro no hover */
+}
+
+.logo-botao {
+  max-width: 120px;
+  height: auto;
+  display: block;
+}
