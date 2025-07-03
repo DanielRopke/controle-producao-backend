@@ -1,16 +1,23 @@
+# Ambientes virtuais
 venv/
-*.pyc
-__pycache__/
-db.sqlite3
-node_modules/
-.env
-*.log
-db.sqlite3
-*.DS_Store
-# backend/.gitignore
-venv/
-node_modules/
 __pycache__/
 *.pyc
 *.pyo
+
+# Arquivos de banco de dados locais
+db.sqlite3
 *.sqlite3
+
+# Logs
+*.log
+
+# Configurações do sistema
+*.DS_Store
+
+# Node.js (caso use em algum script)
+node_modules/
+
+# Arquivos sensíveis (⚠️ EVITE COMMITAR)
+.env
+cred.json
+dados/credenciais.json
