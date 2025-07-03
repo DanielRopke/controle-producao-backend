@@ -6,7 +6,7 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ✅ DEBUG: Verificar se STATIC_ROOT está sendo montado corretamente
-print("STATIC_ROOT DEFINIDO COMO:", os.path.join(BASE_DIR, 'staticfiles'))
+print("STATIC_ROOT DEFINIDO COMO:", STATIC_ROOT)  # Debug
 
 # Chave secreta segura (mantenha segredo em produção!)
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'troque-essa-chave-para-producao')
@@ -92,7 +92,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 # LOCAL ONDE O COLLECTSTATIC VAI JUNTAR OS ARQUIVOS
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.abspath(os.path.join(BASE_DIR, 'staticfiles'))
 
 # DURANTE O DESENVOLVIMENTO (opcional)
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
