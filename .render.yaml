@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: controle-producao-backend
+    env: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: gunicorn backend_project.wsgi:application
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: backend_project.settings
