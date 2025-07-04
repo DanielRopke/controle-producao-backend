@@ -16,7 +16,7 @@ import CarteiraObras from './pages/CarteiraObras'
 import PrioridadeObras from './pages/PrioridadeObras'
 import Mapa from './pages/Mapa'
 import DefeitosProgeo from './pages/DefeitosProgeo'
-import Login from './pages/Login' // importando Login corretamente
+import Login from './pages/Login'
 
 function App() {
   const [logado, setLogado] = useState<boolean>(() => {
@@ -28,13 +28,7 @@ function App() {
   const handleLogin = () => {
     setLogado(true)
     localStorage.setItem('logado', 'true')
-    navigate('/home') // Agora vai para a nova Home após login
-  }
-
-  const handleLogout = () => {
-    setLogado(false)
-    localStorage.removeItem('logado')
-    navigate('/login')
+    navigate('/home')
   }
 
   useEffect(() => {
@@ -48,8 +42,8 @@ function App() {
       <Route path="/login" element={<Login onLogin={handleLogin} />} />
       {logado ? (
         <>
-          <Route path="/home" element={<Home />} /> {/* nova página Home */}
-          <Route path="/obras" element={<Obras onLogout={handleLogout} />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/obras" element={<Obras />} />
           <Route path="/prazos-sap" element={<PrazosSAP />} />
           <Route path="/programacao" element={<Programacao />} />
           <Route path="/faturamento" element={<Faturamento />} />
