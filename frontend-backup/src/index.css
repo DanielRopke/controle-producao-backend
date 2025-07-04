@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Garante que o root ocupa toda a tela e evita rolagem indesejada */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  font-family: system-ui, sans-serif;
+  overflow: hidden; /* bloqueia qualquer rolagem por padrão */
+  background: #000; /* fundo escuro por padrão para efeitos em canvas */
+}
+
+/* Torna o canvas animado (FundoAnimado) fixo em background */
+canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none; /* impede clique no canvas */
+}
+
+/* Estilos para o botão Home com logo */
+.botao-home {
+  height: 48px;
+  background: white;
+  color: #16a34a;
+  padding: 0 1.25rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  box-shadow: 0 4px 6px rgb(0 0 0 / 0.1);
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.botao-home:hover {
+  background-color: #bbf7d0; /* Verde claro no hover */
+}
+
+.logo-botao {
+  max-width: 120px;
+  height: auto;
+  display: block;
+}
