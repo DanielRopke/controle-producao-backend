@@ -1,6 +1,6 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .google_sheets import get_sheet, get_gspread_client
+from .google_sheets import get_sheet
 from .planilha import carregar_planilha_como_dataframe
 from dateutil.parser import parse  # <-- Certifique-se que essa linha está no topo do arquivo
 import datetime
