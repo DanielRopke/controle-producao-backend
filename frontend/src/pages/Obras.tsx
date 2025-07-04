@@ -14,7 +14,8 @@ import defeitosImg from '../assets/defeitos.png'
 
 import logoSetup from '../assets/LogoSetup.png'  // Importação da logo
 
-function Obras({ onLogout }: { onLogout: () => void }) {
+// function Obras({ onLogout }: { onLogout: () => void }) {
+function Obras() {
   const navigate = useNavigate()
 
   const handleGoHome = () => {
