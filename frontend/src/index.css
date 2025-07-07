@@ -2,15 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Garante que o root ocupa toda a tela e bloqueia só a rolagem horizontal */
+/* Garante que o root ocupa toda a tela e evita rolagem indesejada */
 html, body, #root {
   margin: 0;
   padding: 0;
   width: 100vw;
   height: 100vh;
-  overflow-x: hidden; /* bloqueia rolagem horizontal global */
-  /* overflow-y: auto ou hidden não definido aqui para permitir rolagem vertical nas páginas */
   font-family: system-ui, sans-serif;
+  overflow: hidden; /* bloqueia qualquer rolagem por padrão */
+  background: #000; /* fundo escuro por padrão para efeitos em canvas */
+}
+
+/* Torna o canvas animado (FundoAnimado) fixo em background */
+canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none; /* impede clique no canvas */
 }
 
 /* Estilos para o botão Home com logo */
@@ -24,7 +33,6 @@ html, body, #root {
   box-shadow: 0 4px 6px rgb(0 0 0 / 0.1);
   cursor: pointer;
   transition: background-color 0.3s ease;
-
   display: flex;
   align-items: center;
   justify-content: center;

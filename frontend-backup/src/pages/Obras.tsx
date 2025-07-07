@@ -12,7 +12,7 @@ import prioridadeImg from '../assets/prioridade.png'
 import mapaImg from '../assets/mapa.png'
 import defeitosImg from '../assets/defeitos.png'
 
-import logoSetup from '../assets/LogoSetup.png'
+import logoSetup from '../assets/LogoSetup1.png'
 
 function Obras() {
   const navigate = useNavigate()
@@ -52,7 +52,7 @@ function Obras() {
               alt="Logo Setup"
               style={{
                 width: '66.66%',
-                maxWidth: '150px',
+                maxWidth: '600px',
                 height: 'auto',
                 display: 'block',
                 marginTop: '1rem',
@@ -94,7 +94,7 @@ function Obras() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderColor: 'white',
+                    borderColor: '#16a34a',
                   }}
                 >
                   <img
@@ -105,7 +105,7 @@ function Obras() {
                 </Link>
                 <span
                   className="mt-2 font-semibold text-center text-sm max-w-[100px]"
-                  style={{ color: 'white' }}
+                  style={{ color: 'black' }}
                 >
                   {label}
                 </span>
