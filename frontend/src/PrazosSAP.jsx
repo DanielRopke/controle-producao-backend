@@ -13,72 +13,49 @@ import {
 import { useNavigate } from 'react-router-dom'
 import logo from '../assets/logo.png'
 
-interface GraficoItem {
-  status: string
-  seccional: string
-  count: number
-}
-
-interface SeccionalData {
-  seccional: string
-  totalRS: number
-  totalPEP: number
-  scaledPEP?: number
-}
-
-interface MatrizItem {
-  pep: string
-  prazo: string
-  dataConclusao: string
-  statusSap: string
-  valor: string
-  seccional: string
-  tipo: string
-  mesConclusao: string
-}
-
 function PrazosSAP() {
   const navigate = useNavigate()
-  const [seccionais, setSeccionais] = useState<string[]>([])
-  const [statusSapList, setStatusSapList] = useState<string[]>([])
-  const [tiposList, setTiposList] = useState<string[]>([])
-  const [mesesConclusaoList, setMesesConclusaoList] = useState<string[]>([])
+  const [seccionais, setSeccionais] = useState([])
+  const [statusSapList, setStatusSapList] = useState([])
+  const [tiposList, setTiposList] = useState([])
+  const [mesesConclusaoList, setMesesConclusaoList] = useState([])
 
-  const [statusSapSelecionado, setStatusSapSelecionado] = useState<string>(() => localStorage.getItem('statusSapSelecionado') || '')
-  const [tipoSelecionado, setTipoSelecionado] = useState<string>(() => localStorage.getItem('tipoSelecionado') || '')
-  const [mesSelecionado, setMesSelecionado] = useState<string>(() => localStorage.getItem('mesSelecionado') || '')
-  const [seccionaisSelecionadas, setSeccionaisSelecionadas] = useState<string[]>(() => {
+  const [statusSapSelecionado, setStatusSapSelecionado] = useState(() => localStorage.getItem('statusSapSelecionado') || '')
+  const [tipoSelecionado, setTipoSelecionado] = useState(() => localStorage.getItem('tipoSelecionado') || '')
+  const [mesSelecionado, setMesSelecionado] = useState(() => localStorage.getItem('mesSelecionado') || '')
+  const [seccionaisSelecionadas, setSeccionaisSelecionadas] = useState(() => {
     const saved = localStorage.getItem('seccionaisSelecionadas')
     return saved ? JSON.parse(saved) : []
   })
 
-  const [graficoDataEner, setGraficoDataEner] = useState<GraficoItem[]>([])
-  const [graficoDataConc, setGraficoDataConc] = useState<GraficoItem[]>([])
-  const [graficoDataServico, setGraficoDataServico] = useState<{ status: string, count: number }[]>([])
-  const [graficoDataSeccionalRS, setGraficoDataSeccionalRS] = useState<SeccionalData[]>([])
-  const [matrizDados, setMatrizDados] = useState<MatrizItem[]>([])
+  const [graficoDataEner, setGraficoDataEner] = useState([])
+  const [graficoDataConc, setGraficoDataConc] = useState([])
+  const [graficoDataServico, setGraficoDataServico] = useState([])
+  const [graficoDataSeccionalRS, setGraficoDataSeccionalRS] = useState([])
+  const [matrizDados, setMatrizDados] = useState([])
 
   // Busca dados iniciais e listas para filtros
+  const API_BASE = import.meta.env.VITE_API_URL;
   useEffect(() => {
-    axios.get("http://127.0.0.1:8000/api/seccionais/")
+    axios.get(`${API_BASE}/seccionais/`)
       .then(resp => setSeccionais(resp.data))
       .catch(() => {})
 
-    axios.get("http://127.0.0.1:8000/api/status-sap-unicos/")
+    axios.get(`${API_BASE}/status-sap-unicos/`)
       .then(resp => setStatusSapList(resp.data))
       .catch(() => {})
 
-    axios.get("http://127.0.0.1:8000/api/tipos-unicos/")
+    axios.get(`${API_BASE}/tipos-unicos/`)
       .then(resp => setTiposList(resp.data))
       .catch(() => {})
 
-    axios.get("http://127.0.0.1:8000/api/meses-conclusao/")
+    axios.get(`${API_BASE}/meses-conclusao/`)
       .then(resp => setMesesConclusaoList(resp.data))
       .catch(() => {})
 
-    axios.get("http://127.0.0.1:8000/api/status-ener-pep/")
+    axios.get(`${API_BASE}/status-ener-pep/`)
       .then(resp => {
-        const todos = Object.entries(resp.data).flatMap(([status, obj]: any) =>
+        const todos = Object.entries(resp.data).flatMap(([status, obj]) =>
           Object.entries(obj).map(([seccional, count]) => ({
             status,
             seccional,
@@ -89,9 +66,9 @@ function PrazosSAP() {
       })
       .catch(() => {})
 
-    axios.get("http://127.0.0.1:8000/api/status-conc-pep/")
+    axios.get(`${API_BASE}/status-conc-pep/`)
       .then(resp => {
-        const todos = Object.entries(resp.data).flatMap(([status, obj]: any) =>
+        const todos = Object.entries(resp.data).flatMap(([status, obj]) =>
           Object.entries(obj).map(([seccional, count]) => ({
             status,
             seccional,
@@ -102,7 +79,7 @@ function PrazosSAP() {
       })
       .catch(() => {})
 
-    axios.get("http://127.0.0.1:8000/api/status-servico-contagem/")
+    axios.get(`${API_BASE}/status-servico-contagem/`)
       .then(resp => {
         const servico = Object.entries(resp.data)
           .filter(([status]) => status.trim() !== "" && status.toLowerCase() !== "vazio")
@@ -114,11 +91,11 @@ function PrazosSAP() {
       })
       .catch(() => {})
 
-    axios.get("http://127.0.0.1:8000/api/seccional-rs-pep/")
+    axios.get(`${API_BASE}/seccional-rs-pep/`)
       .then(resp => {
         const dadosFiltrados = Object.entries(resp.data)
           .filter(([seccional]) => seccional !== '#N/A')
-          .map(([seccional, valores]: any) => ({
+          .map(([seccional, valores]) => ({
             seccional,
             totalRS: Number(valores.valor.toFixed(0)),
             totalPEP: valores.pep_count,
@@ -143,12 +120,12 @@ function PrazosSAP() {
     if (tipoSelecionado) params.append('tipo', tipoSelecionado)
     if (mesSelecionado) params.append('mes', mesSelecionado)
 
-    axios.get(`http://127.0.0.1:8000/api/matriz-dados/?${params.toString()}`)
+    axios.get(`${API_BASE}/matriz-dados/?${params.toString()}`)
       .then(resp => setMatrizDados(resp.data))
       .catch(() => {})
   }, [seccionaisSelecionadas, statusSapSelecionado, tipoSelecionado, mesSelecionado])
 
-  const toggleSeccional = (seccional: string) => {
+  const toggleSeccional = (seccional) => {
     setSeccionaisSelecionadas(prev =>
       prev.includes(seccional)
         ? prev.filter(s => s !== seccional)
@@ -156,13 +133,13 @@ function PrazosSAP() {
     )
   }
 
-  const processarDados = (dados: GraficoItem[], ignorarFechada = false) => {
+  const processarDados = (dados, ignorarFechada = false) => {
     return Object.entries(
       dados.filter(item => {
         const seccionalMatch = seccionaisSelecionadas.length === 0 || seccionaisSelecionadas.includes(item.seccional)
         const statusValido = ignorarFechada ? !["fechada", "fechado"].includes(item.status.toLowerCase()) : true
         return seccionalMatch && statusValido
-      }).reduce((acc: Record<string, number>, curr) => {
+      }).reduce((acc, curr) => {
         acc[curr.status] = (acc[curr.status] || 0) + curr.count
         return acc
       }, {}))
@@ -172,7 +149,7 @@ function PrazosSAP() {
   const dadosGraficoEner = processarDados(graficoDataEner)
   const dadosGraficoConc = processarDados(graficoDataConc, true)
 
-  const formatarValorRS = (valor: number) =>
+  const formatarValorRS = (valor) =>
     valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })
 
   return (
@@ -289,7 +266,7 @@ function PrazosSAP() {
                     <XAxis dataKey="seccional" tick={{ fill: '#4a4a4a' }} />
                     <YAxis hide />
                     <Tooltip
-                      formatter={(value: number, name: string) => [
+                      formatter={(value, name) => [
                         name === 'totalRS' ? formatarValorRS(value) : value,
                         name === 'totalRS' ? 'R$' : 'PEP',
                       ]}
