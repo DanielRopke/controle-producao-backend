@@ -75,8 +75,13 @@ DATABASES = {
     )
 }
 
-# CORS - permitir todos os domínios (seguro apenas para desenvolvimento)
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS - permitir apenas o domínio do frontend em produção
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "https://www.controlesetup.com.br",
+    ]
 
 # Idioma e fuso horário
 LANGUAGE_CODE = 'pt-br'
