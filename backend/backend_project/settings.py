@@ -84,13 +84,24 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     'access-control-allow-origin',
 ]
 
+# Métodos HTTP permitidos
+from corsheaders.defaults import default_methods
+CORS_ALLOW_METHODS = list(default_methods) + [
+    'PATCH',
+    'OPTIONS',
+]
+
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
+    # Em debug, aceita qualquer origem
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:5173",
+        "https://www.controlesetup.com.br",
+        "https://controle-producao-frontend.vercel.app",
     ]
 else:
     CORS_ALLOW_ALL_ORIGINS = False
+    # Em produção, só aceita origens explícitas
     CORS_ALLOWED_ORIGINS = [
         "https://www.controlesetup.com.br",
         "https://controle-producao-frontend.vercel.app",
