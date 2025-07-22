@@ -12,7 +12,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'troque-essa-chave-para-producao')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
 # Domínios permitidos
-ALLOWED_HOSTS = ['controle-producao-backend.onrender.com']
+ALLOWED_HOSTS = ['controle-producao-backend.onrender.com', 'localhost', '127.0.0.1']
 
 # Aplicativos instalados
 INSTALLED_APPS = [
@@ -75,12 +75,26 @@ DATABASES = {
     )
 }
 
-# CORS - permitir apenas o domínio do frontend em produção
+
+# CORS - permitir frontend local e produção
+from corsheaders.defaults import default_headers
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'access-control-allow-origin',
+]
+
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+    ]
 else:
+    CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = [
         "https://www.controlesetup.com.br",
+        "https://controle-producao-frontend.vercel.app",
+        "http://localhost:5173",
     ]
 
 # Idioma e fuso horário
