@@ -1,3 +1,5 @@
+# Necessário para o load_dotenv no manage.py
+python-dotenv
 cachetools==5.5.2
 certifi==2025.6.15
 charset-normalizer==3.4.2
