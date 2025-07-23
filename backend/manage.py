@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 """Django's command-line utility for administrative tasks."""
 import os
+from dotenv import load_dotenv
 import sys
 
 
 def main():
+    # Carrega variáveis do .env automaticamente em ambiente local
+    load_dotenv()
     """Run administrative tasks."""
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend_project.settings")
     try:

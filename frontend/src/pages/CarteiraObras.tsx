@@ -5,7 +5,7 @@ function CarteiraObras() {
       <h1 className="text-3xl font-bold mb-4">Carteira de Obras</h1>
       <p>Conteúdo da página Carteira de Obras.</p>
     </div>
-  )
+  );
 }
 
 export default CarteiraObras

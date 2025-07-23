@@ -8,7 +8,10 @@ export function FundoAnimado() {
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
-
+    // Fallback para acessibilidade
+    if (!mount) {
+      return;
+    }
     // Cena e câmera
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#f0f2f5"); // Fundo cinza claro
@@ -26,6 +29,8 @@ export function FundoAnimado() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     mount.appendChild(renderer.domElement);
+    renderer.domElement.setAttribute('aria-label', 'Fundo animado visual');
+    renderer.domElement.setAttribute('role', 'img');
 
     // Textura circular das bolinhas (verde uniforme)
     const circleCanvas = document.createElement("canvas");
@@ -295,5 +300,5 @@ export function FundoAnimado() {
     };
   }, []);
 
-  return <div ref={mountRef} className="fixed top-0 left-0 w-full h-full z-0" />;
+  return <div ref={mountRef} style={{ width: '100vw', height: '100vh', position: 'fixed', inset: 0, zIndex: -1 }} aria-hidden="true" />;
 }

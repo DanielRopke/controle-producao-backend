@@ -1,11 +1,8 @@
 
 import axios from 'axios'
 
-// Alternância automática entre local e hospedado
-const API_BASE =
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://127.0.0.1:8000/api'
-    : import.meta.env.VITE_API_BASE;
+// Força uso do backend do Render para todas as chamadas
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 export const api = {
   getSeccionais: () => axios.get<string[]>(`${API_BASE}/seccionais/`),

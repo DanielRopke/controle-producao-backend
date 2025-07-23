@@ -5,7 +5,7 @@ function DefeitosProgeo() {
       <h1 className="text-3xl font-bold mb-4">Defeitos Progeo</h1>
       <p>Conteúdo da página Defeitos Progeo.</p>
     </div>
-  )
+  );
 }
 
 export default DefeitosProgeo

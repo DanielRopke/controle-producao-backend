@@ -5,7 +5,7 @@ function KPIManutencao() {
       <h1 className="text-3xl font-bold mb-4">KPI Manutenção</h1>
       <p>Conteúdo da página KPI Manutenção.</p>
     </div>
-  )
+  );
 }
 
 export default KPIManutencao

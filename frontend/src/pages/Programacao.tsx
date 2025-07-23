@@ -5,7 +5,7 @@ function Programacao() {
       <h1 className="text-3xl font-bold mb-4">Programação</h1>
       <p>Conteúdo da página Programação.</p>
     </div>
-  )
+  );
 }
 
 export default Programacao

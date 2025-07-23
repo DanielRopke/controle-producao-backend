@@ -5,7 +5,7 @@ function Faturamento() {
       <h1 className="text-3xl font-bold mb-4">Faturamento</h1>
       <p>Conteúdo da página Faturamento.</p>
     </div>
-  )
+  );
 }
 
 export default Faturamento

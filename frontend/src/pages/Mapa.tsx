@@ -5,7 +5,7 @@ function Mapa() {
       <h1 className="text-3xl font-bold mb-4">Mapa</h1>
       <p>Conteúdo da página Mapa.</p>
     </div>
-  )
+  );
 }
 
 export default Mapa

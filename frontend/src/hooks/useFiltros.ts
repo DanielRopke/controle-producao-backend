@@ -1,4 +1,11 @@
+
 import { useState } from 'react'
+
+/**
+ * Hook para gerenciar filtros selecionados na dashboard.
+ * Salva e recupera filtros do localStorage.
+ * @returns Filtros selecionados e funções para alterar cada filtro.
+ */
 
 export function useFiltros() {
   const [seccionaisSelecionadas, setSeccionaisSelecionadas] = useState<string[]>(

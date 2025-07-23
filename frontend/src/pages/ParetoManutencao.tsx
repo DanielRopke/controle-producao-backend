@@ -5,7 +5,7 @@ function ParetoManutencao() {
       <h1 className="text-3xl font-bold mb-4">Pareto Manutenção</h1>
       <p>Conteúdo da página Pareto Manutenção.</p>
     </div>
-  )
+  );
 }
 
 export default ParetoManutencao

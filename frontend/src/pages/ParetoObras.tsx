@@ -5,7 +5,7 @@ function ParetoObras() {
       <h1 className="text-3xl font-bold mb-4">Pareto Obras</h1>
       <p>Conteúdo da página Pareto Obras.</p>
     </div>
-  )
+  );
 }
 
 export default ParetoObras

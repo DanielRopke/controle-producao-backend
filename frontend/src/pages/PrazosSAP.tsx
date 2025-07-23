@@ -50,15 +50,28 @@ export default function PrazosSAP() {
 
 
 
+  // Ordenação decrescente garantida
   const dadosEner = processarDados(graficoEner, false, { seccionais: seccionaisSelecionadas })
-    .slice().sort((a, b) => (b.valor ?? 0) - (a.valor ?? 0));
+    .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
   const dadosConc = processarDados(graficoConc, true, { seccionais: seccionaisSelecionadas })
-    .slice().sort((a, b) => (b.valor ?? 0) - (a.valor ?? 0));
+    .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
   const dadosServico = processarDados(graficoServico, false, { seccionais: seccionaisSelecionadas })
-    .slice().sort((a, b) => (b.valor ?? 0) - (a.valor ?? 0));
+    .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
   const graficoSeccionalRSOrdenado = Array.isArray(graficoSeccionalRS)
     ? graficoSeccionalRS.slice().sort((a, b) => (b.totalRS ?? 0) - (a.totalRS ?? 0))
     : graficoSeccionalRS;
+
+  // Função para tratar clique nas barras dos gráficos
+  const handleBarClick = (item: { status?: string, count?: number }, tipoGrafico: string) => {
+    if (!item) return;
+    if (tipoGrafico === 'ener' && item.status) {
+      setStatusSap(item.status);
+    }
+    if (tipoGrafico === 'conc' && item.status) {
+      setTipo(item.status);
+    }
+    // Adapte para outros gráficos conforme necessário
+  };
 
 
 
@@ -138,7 +151,7 @@ export default function PrazosSAP() {
             style={{ width: 160, height: 48, backgroundColor: '#fff' }}
           >
             <span>Valor Total</span>
-            <span className="text-green-700 text-base font-semibold" style={{ fontWeight: 600 }}>
+            <span className="text-base font-semibold text-green-700" style={{ fontWeight: 600 }}>
               {formatarValorRS(
                 Array.isArray(graficoSeccionalRS)
                   ? graficoSeccionalRS.reduce((acc, cur) => acc + (cur.totalRS || 0), 0)
@@ -146,16 +159,16 @@ export default function PrazosSAP() {
               )}
             </span>
           </div>
-          <h1 className="text-white text-2xl font-bold font-serif text-center flex-grow">
+          <h1 className="flex-grow font-serif text-2xl font-bold text-center text-white">
             Prazos SAP
           </h1>
           <div style={{ minWidth: 0, flex: '0 0 384px', display: 'flex', justifyContent: 'flex-end', gap: '12px', marginRight: '16px' }}>
             <div
-              className="rounded-full bg-gray-800 border-2 border-gray-700 shadow-3d flex flex-col items-center justify-center font-bold text-gray-100 text-lg"
+              className="flex flex-col items-center justify-center text-lg font-bold text-gray-100 bg-gray-800 border-2 border-gray-700 rounded-full shadow-3d"
               style={{ width: 160, height: 48, backgroundColor: '#fff' }}
             >
               <span>Valor Total</span>
-              <span className="text-green-700 text-base font-semibold" style={{ fontWeight: 600 }}>
+              <span className="text-base font-semibold text-green-700" style={{ fontWeight: 600 }}>
                 {formatarValorRS(
                   Array.isArray(graficoSeccionalRS)
                     ? graficoSeccionalRS.reduce((acc, cur) => acc + (cur.totalRS || 0), 0)
@@ -164,11 +177,11 @@ export default function PrazosSAP() {
               </span>
             </div>
             <div
-              className="rounded-full bg-gray-800 border-2 border-gray-700 shadow-3d flex flex-col items-center justify-center font-bold text-gray-100 text-lg"
+              className="flex flex-col items-center justify-center text-lg font-bold text-gray-100 bg-gray-800 border-2 border-gray-700 rounded-full shadow-3d"
               style={{ width: 160, height: 48, backgroundColor: '#fff' }}
             >
               <span>Qtd de PEP</span>
-              <span className="text-green-700 text-base font-semibold" style={{ fontWeight: 600 }}>
+              <span className="text-base font-semibold text-green-700" style={{ fontWeight: 600 }}>
                 {Array.isArray(graficoSeccionalRS)
                   ? graficoSeccionalRS.reduce((acc, cur) => acc + (cur.totalPEP || 0), 0)
                   : 0}
@@ -186,9 +199,9 @@ export default function PrazosSAP() {
               left: 0,
               zIndex: 50,
               width: 185,
-              height: 'calc(100vh - 88px)',
+              height: 'calc(100vh - 88px - 16px)', // 16px de espaçamento inferior
               minHeight: 400,
-              marginBottom: 16,
+              marginBottom: 0,
               display: 'flex',
               flexDirection: 'column',
               background: 'linear-gradient(135deg, rgba(74,222,128,0.85) 0%, rgba(34,197,94,0.85) 100%)',
@@ -222,21 +235,59 @@ export default function PrazosSAP() {
             <div className="flex gap-8">
               <div className="flex flex-col flex-1 gap-8">
                 <div className="z-[10]">
-                  <GraficoBarras titulo="Status ENER" dados={dadosEner} />
+                  <GraficoBarras
+                    titulo="Status ENER"
+                    dados={dadosEner}
+                    onBarClick={item => handleBarClick(item, 'ener')}
+                  />
                 </div>
                 <div style={{ height: '16px' }} />
                 <div className="z-[10]">
-                  <GraficoBarras titulo="Status CONC" dados={dadosConc} />
+                  <GraficoBarras
+                    titulo="Status CONC"
+                    dados={dadosConc}
+                    onBarClick={item => handleBarClick(item, 'conc')}
+                  />
                 </div>
               </div>
               <div style={{ width: '16px' }} />
               <div className="flex flex-col flex-1 gap-8">
-                <div className="p-6 rounded-3xl shadow-lg h-[280px] flex flex-col z-[10]" style={{background: 'linear-gradient(135deg, #bbf7d0 0%, #a7f3d0 100%)', borderRadius: '1.5rem', marginRight: '16px'}}>
+                <div className="p-6 rounded-3xl shadow-lg h-[280px] flex flex-col z-[10] relative" style={{background: 'linear-gradient(135deg, #bbf7d0 0%, #a7f3d0 100%)', borderRadius: '1.5rem', marginRight: '16px'}}>
+                  <button
+                    title="Copiar imagem do gráfico"
+                    onClick={async e => {
+                      e.stopPropagation();
+                      const graficoDiv = e.currentTarget.parentElement;
+                      if (!graficoDiv) return;
+                      const html2canvas = (await import('html2canvas')).default;
+                      html2canvas(graficoDiv, { backgroundColor: null }).then(canvas => {
+                        canvas.toBlob(blob => {
+                          if (blob) {
+                            const item = new ClipboardItem({ 'image/png': blob });
+                            navigator.clipboard.write([item]);
+                          }
+                        });
+                      });
+                    }}
+                    style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, width: 32, height: 32, background: '#fff', borderRadius: 8, border: '2px solid #4ade80', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                  >
+                    {/* Ícone clássico de copiar (duas folhas) */}
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="6" y="6" width="9" height="12" rx="2" fill="#bbf7d0" stroke="#22c55e" strokeWidth="1.5" />
+                      <rect x="3" y="3" width="9" height="12" rx="2" fill="#fff" stroke="#22c55e" strokeWidth="1.2" />
+                    </svg>
+                  </button>
                   <h2 className="text-center font-semibold mb-4 font-serif text-gray-700 text-[20px]">
-                    Comparativo por Seccional: R$ e Qtd PEP
+                    Valor x Qtd PEP Por Seccional
                   </h2>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={graficoSeccionalRSOrdenado} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
+                      <BarChart data={graficoSeccionalRSOrdenado} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}
+                        onClick={e => {
+                          if (e && e.activePayload && e.activePayload[0]) {
+                            handleBarClick(e.activePayload[0].payload, 'seccional');
+                          }
+                        }}
+                      >
                       <foreignObject x={0} y={0} width="100%" height="100%">
                         <div style={{width: '100%', height: '100%', background: 'rgba(255,255,255,0.9)', borderRadius: 20, backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(16px)'}} />
                       </foreignObject>
@@ -263,7 +314,11 @@ export default function PrazosSAP() {
                   <div className="relative z-[20]">
                     <div className="absolute top-0 left-0 w-full h-[48px] rounded-t-3xl bg-white/90 backdrop-blur-md z-[30] pointer-events-none" />
                     <div className="relative z-[40]">
-                      <GraficoBarras titulo="Motivo de Não Fechado" dados={dadosServico} />
+                      <GraficoBarras
+                        titulo="Motivo de Não Fechado"
+                        dados={dadosServico}
+                        onBarClick={item => handleBarClick(item, 'servico')}
+                      />
                     </div>
                   </div>
                 </div>
