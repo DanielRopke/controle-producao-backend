@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from .google_sheets import get_sheet
 from .planilha import carregar_planilha_como_dataframe
-from dados.serializers import MatrizItemSerializer
+from .serializers import MatrizItemSerializer
 from dateutil.parser import parse
 import os
 
