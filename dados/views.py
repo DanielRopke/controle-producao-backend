@@ -1,3 +1,14 @@
+from rest_framework.decorators import api_view
+@api_view(['GET'])
+def colunas_planilha(request):
+    try:
+        dados = carregar_planilha_como_dataframe('Prazos SAP')
+        if not dados:
+            return Response({'error': 'Nenhum dado encontrado na planilha.'}, status=404)
+        primeira_linha = dados[0]
+        return Response({'colunas': list(primeira_linha.keys())})
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
@@ -10,11 +21,17 @@ import os
 
 @api_view(['GET'])
 def exemplo(request):
+    """
+    Endpoint de exemplo para testar funcionamento da API.
+    """
     return Response({"mensagem": "API funcionando com sucesso!"})
 
 
 @api_view(['GET'])
 def geral(request):
+    """
+    Retorna dados gerais da planilha 'GERAL'.
+    """
     try:
         data = get_sheet('GERAL')
         return Response(data)
@@ -24,6 +41,9 @@ def geral(request):
 
 @api_view(['GET'])
 def programacao(request):
+    """
+    Retorna dados da aba 'programação' da planilha.
+    """
     try:
         data = get_sheet('programação')
         return Response(data)
@@ -33,6 +53,9 @@ def programacao(request):
 
 @api_view(['GET'])
 def carteira(request):
+    """
+    Retorna dados da aba 'Prazos SAP' da planilha.
+    """
     try:
         data = get_sheet('Prazos SAP')
         return Response(data)
@@ -225,7 +248,7 @@ def matriz_dados(request):
 
         for row in dados:
             seccional = (row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or '').strip()
-            status_sap = (row.get('Status SAP') or '').strip()
+            status_sap = (row.get('STATUS SAP') or '').strip()
             tipo = (row.get('TIPO') or '').strip()
             data_conclusao = (row.get('DATA CONCLUSÃO') or '').strip()
 
@@ -259,11 +282,17 @@ def matriz_dados(request):
             if not pep or not valor:
                 continue
 
+            # Log para depuração dos valores lidos
+            if not row.get('PRAZO'):
+                print(f"Linha sem PRAZO: {row}")
+            if not row.get('STATUS SAP'):
+                print(f"Linha sem STATUS SAP: {row}")
+
             dados_filtrados.append({
                 'pep': pep,
-                'prazo': row.get('Prazo', ''),
+                'prazo': row.get('PRAZO', ''),
                 'dataConclusao': data_conclusao,
-                'statusSap': status_sap,
+                'statusSap': row.get('STATUS SAP', ''),
                 'valor': valor,
                 'seccional': seccional,
                 'tipo': tipo

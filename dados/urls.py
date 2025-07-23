@@ -1,6 +1,5 @@
 from django.urls import path
 from . import views
-from .views import meses_conclusao
 
 urlpatterns = [
     path('exemplo/', views.exemplo),
