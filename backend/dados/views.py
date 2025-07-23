@@ -1,16 +1,17 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from .google_sheets import get_sheet
 from .planilha import carregar_planilha_como_dataframe
-from dateutil.parser import parse  # <-- Certifique-se que essa linha está no topo do arquivo
-import datetime
-import json, os
-credenciais_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS_JSON')
+from .serializers import MatrizItemSerializer
+from dateutil.parser import parse
+import os
 
 
 @api_view(['GET'])
 def exemplo(request):
     return Response({"mensagem": "API funcionando com sucesso!"})
+
 
 @api_view(['GET'])
 def geral(request):
@@ -20,6 +21,7 @@ def geral(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def programacao(request):
     try:
@@ -28,13 +30,15 @@ def programacao(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def carteira(request):
     try:
-        data = get_sheet('importCarteiraObra')
+        data = get_sheet('Prazos SAP')
         return Response(data)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
 
 @api_view(['GET'])
 def meta(request):
@@ -44,23 +48,34 @@ def meta(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def seccionais(request):
     try:
-        data = get_sheet('importCarteiraObra')
+        print('Antes do get_sheet')
+        data = get_sheet('Prazos SAP')
+        print('Depois do get_sheet, data:', data)
+        if not data:
+            print('ATENÇÃO: get_sheet retornou None ou lista vazia!')
         seccional_col = [row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') for row in data]
+        print('Coluna SECCIONAL extraída:', seccional_col)
         invalid_values = ['', None, '#N/A', 'N/A', 'na', 'NaN']
         seccional_unicos = sorted(set(
             v.strip() for v in seccional_col if v and v.strip() not in invalid_values
         ))
+        print('Seccionais únicos:', seccional_unicos)
         return Response(seccional_unicos)
     except Exception as e:
+        import traceback
+        print('Erro em /api/seccionais/:', e)
+        traceback.print_exc()
         return Response({'error': str(e)}, status=500)
+
 
 @api_view(['GET'])
 def status_sap_unicos(request):
     try:
-        data = get_sheet('importCarteiraObra')
+        data = get_sheet('Prazos SAP')
         status_sap_col = [row.get('STATUS SAP') or row.get('Status SAP') or '' for row in data]
         invalid = ['', None, '#N/A', 'N/A', 'na', 'NaN']
         unicos = sorted(set(
@@ -69,6 +84,7 @@ def status_sap_unicos(request):
         return Response(unicos)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
 
 @api_view(['GET'])
 def defeitos(request):
@@ -92,13 +108,14 @@ def defeitos(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def carteira_por_seccional(request):
     try:
         seccional_param = request.GET.get('seccional', '').strip()
         if not seccional_param:
             return Response({'error': 'Parâmetro "seccional" é obrigatório'}, status=400)
-        data = get_sheet('importCarteiraObra')
+        data = get_sheet('Prazos SAP')
         filtrado = [
             row for row in data
             if (row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA', '')).strip() == seccional_param
@@ -107,10 +124,11 @@ def carteira_por_seccional(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def status_ener_pep(request):
     try:
-        data = get_sheet('importCarteiraObra')
+        data = get_sheet('Prazos SAP')
         ignorar = {"em andamento", "fechada"}
         contagem = {}
         for row in data:
@@ -127,10 +145,11 @@ def status_ener_pep(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def status_conc_pep(request):
     try:
-        data = get_sheet('importCarteiraObra')
+        data = get_sheet('Prazos SAP')
         ignorar = {"em andamento", "fechada"}
         contagem = {}
         for row in data:
@@ -147,10 +166,11 @@ def status_conc_pep(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def status_servico_contagem(request):
     try:
-        data = get_sheet('importCarteiraObra')
+        data = get_sheet('Prazos SAP')
         contagem = {}
         for row in data:
             status = row.get('status serviço') or row.get('STATUS SERVIÇO') or row.get('Status Serviço')
@@ -161,10 +181,11 @@ def status_servico_contagem(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def seccional_rs_pep(request):
     try:
-        data = get_sheet('importCarteiraObra')
+        data = get_sheet('Prazos SAP')
         resultado = {}
         for row in data:
             seccional = (row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or '').strip()
@@ -184,6 +205,7 @@ def seccional_rs_pep(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def matriz_dados(request):
     try:
@@ -198,7 +220,7 @@ def matriz_dados(request):
         status_saps = [s.strip() for s in status_sap_filtro.split(',') if s.strip()] if status_sap_filtro else []
         tipos = [s.strip() for s in tipo_filtro.split(',') if s.strip()] if tipo_filtro else []
 
-        dados = carregar_planilha_como_dataframe('importCarteiraObra')
+        dados = carregar_planilha_como_dataframe('Prazos SAP')
         dados_filtrados = []
 
         for row in dados:
@@ -252,10 +274,11 @@ def matriz_dados(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def tipos_unicos(request):
     try:
-        data = get_sheet('importCarteiraObra')
+        data = get_sheet('Prazos SAP')
         tipo_col = [row.get('TIPO') or '' for row in data]
         invalid = ['', None, '#N/A', 'N/A', 'na', 'NaN']
         unicos = sorted(set(
@@ -265,10 +288,11 @@ def tipos_unicos(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def meses_conclusao(request):
     try:
-        data = get_sheet('importCarteiraObra')
+        data = get_sheet('Prazos SAP')
         datas = [row.get('DATA CONCLUSÃO') or '' for row in data]
         meses = set()
         for d in datas:
