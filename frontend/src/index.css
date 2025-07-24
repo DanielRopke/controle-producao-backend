@@ -14,6 +14,13 @@ html, body, #root {
   background: white;    /* fundo branco igual ao front */
 }
 
+/* Remove a borda preta (outline) ao focar nos gráficos do Recharts */
+.recharts-wrapper:focus,
+.recharts-wrapper *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* Torna o canvas animado (FundoAnimado) fixo em background */
 canvas {
   position: fixed;

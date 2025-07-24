@@ -12,7 +12,12 @@ export const api = {
 
   getGraficoEner: () => axios.get<Record<string, Record<string, number>>>(`${API_BASE}/status-ener-pep/`),
   getGraficoConc: () => axios.get<Record<string, Record<string, number>>>(`${API_BASE}/status-conc-pep/`),
-  getGraficoServico: () => axios.get<Record<string, Record<string, number>>>(`${API_BASE}/status-servico-contagem/`),
+  getGraficoServico: (params?: URLSearchParams) => {
+    const url = params && params.toString()
+      ? `${API_BASE}/status-servico-contagem/?${params.toString()}`
+      : `${API_BASE}/status-servico-contagem/`;
+    return axios.get<Record<string, Record<string, number>>>(url);
+  },
   getGraficoSeccionalRS: () => axios.get<Record<string, { valor: number; pep_count: number }>>(`${API_BASE}/seccional-rs-pep/`),
 
   getMatrizDados: (params: URLSearchParams) => axios.get(`${API_BASE}/matriz-dados/?${params.toString()}`)

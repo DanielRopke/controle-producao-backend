@@ -57,9 +57,21 @@ export default function PrazosSAP() {
     .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
   const dadosConc = processarDados(graficoConc, true, { seccionais: seccionaisSelecionadas })
     .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
-  // Sempre mostra os dados de motivos, independente do filtro de seccional, igual ao gráfico Status ENER
-  const dadosServico: { status: string; count: number }[] = processarDados(graficoServico, false, { seccionais: seccionaisSelecionadas })
-    .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+  // Motivo de Não Fechado: agrupa por status, somando todas as seccionais selecionadas
+  const dadosServico = Array.isArray(graficoServico)
+    ? graficoServico
+        .filter(item => !seccionaisSelecionadas.length || seccionaisSelecionadas.includes(item.seccional))
+        .reduce((acc, item) => {
+          const found = acc.find(d => d.status === item.status);
+          if (found) {
+            found.count += item.count;
+          } else {
+            acc.push({ status: item.status, count: item.count });
+          }
+          return acc;
+        }, [] as { status: string; count: number }[])
+        .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+    : [];
   // Filtra os dados conforme os filtros aplicados
   const graficoSeccionalRSFiltrado = Array.isArray(graficoSeccionalRS)
     ? graficoSeccionalRS.filter(item => {

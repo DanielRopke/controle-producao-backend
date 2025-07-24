@@ -6,6 +6,7 @@ export type GraficoItem = {
 
 export type ServicoItem = {
   status: string;
+  seccional: string;
   count: number;
 };
 

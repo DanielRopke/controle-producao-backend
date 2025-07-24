@@ -36,9 +36,14 @@ export function useDadosGraficos(filtros: {
     api.getMesesConclusao().then(r => setMesesList(r.data));
     api.getGraficoEner().then(r => setGraficoEner(flattenGrafico(r.data)));
     api.getGraficoConc().then(r => setGraficoConc(flattenGrafico(r.data)));
-    api.getGraficoServico().then(r => setGraficoServico(flattenServico(r.data, filtros.seccionais)));
+    const params = new URLSearchParams();
+    if (filtros.seccionais.length) params.append('seccional', filtros.seccionais.join(','));
+    if (filtros.statusSap) params.append('status_sap', filtros.statusSap);
+    if (filtros.tipo) params.append('tipo', filtros.tipo);
+    if (filtros.mes) params.append('mes', filtros.mes);
+    api.getGraficoServico(params).then(r => setGraficoServico(flattenGrafico(r.data)));
     api.getGraficoSeccionalRS().then(r => setGraficoSeccionalRS(flattenSeccionalRS(r.data)));
-  }, []);
+  }, [filtros.seccionais, filtros.statusSap, filtros.tipo, filtros.mes]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -55,19 +60,12 @@ export function useDadosGraficos(filtros: {
     );
   }
   // Suporta tanto o formato antigo quanto o novo (agrupado por seccional)
-  function flattenServico(data: Record<string, number> | Record<string, Record<string, number>>, seccionalFiltro?: string[]): ServicoItem[] {
+  function flattenServico(data: Record<string, number> | Record<string, Record<string, number>>): ServicoItem[] {
     if (typeof Object.values(data)[0] === 'object') {
       const result: ServicoItem[] = [];
       Object.entries(data as Record<string, Record<string, number>>).forEach(([status, seccionaisObj]) => {
         if (typeof seccionaisObj !== 'object') return;
-        let total = 0;
-        if (Array.isArray(seccionalFiltro) && seccionalFiltro.length > 0) {
-          seccionalFiltro.forEach(sec => {
-            total += Number(seccionaisObj[sec] || 0);
-          });
-        } else {
-          total = Object.values(seccionaisObj).reduce((acc, v) => acc + Number(v || 0), 0);
-        }
+        const total = Object.values(seccionaisObj).reduce((acc, v) => acc + Number(v || 0), 0);
         if (status.trim() !== '' && status.toLowerCase() !== 'vazio') {
           result.push({ status, count: total });
         }

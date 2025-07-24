@@ -193,11 +193,34 @@ def status_conc_pep(request):
 @api_view(['GET'])
 def status_servico_contagem(request):
     try:
+        seccional_filtro = request.GET.get('seccional', '').strip()
+        seccionais = [s.strip() for s in seccional_filtro.split(',') if s.strip()] if seccional_filtro else []
+        status_sap_filtro = request.GET.get('status_sap', '').strip()
+        tipo_filtro = request.GET.get('tipo', '').strip()
+        mes_filtro = request.GET.get('mes', '').strip()
         data = get_sheet('Prazos SAP')
         contagem = {}
         for row in data:
             status = row.get('status serviço') or row.get('STATUS SERVIÇO') or row.get('Status Serviço')
             seccional = (row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or '').strip()
+            status_sap = (row.get('STATUS SAP') or '').strip()
+            tipo = (row.get('TIPO') or '').strip()
+            data_conclusao = (row.get('DATA CONCLUSÃO') or '').strip()
+            # Filtros
+            if seccionais and seccional not in seccionais:
+                continue
+            if status_sap_filtro and status_sap_filtro != status_sap:
+                continue
+            if tipo_filtro and tipo_filtro != tipo:
+                continue
+            if mes_filtro:
+                from dateutil.parser import parse
+                try:
+                    dt = parse(data_conclusao, dayfirst=True)
+                    if dt.strftime('%Y-%m') != mes_filtro:
+                        continue
+                except:
+                    continue
             if not status or not seccional:
                 continue
             status = status.strip()

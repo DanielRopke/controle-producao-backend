@@ -233,26 +233,77 @@ function PrazosSAP() {
         <div className="flex flex-col flex-1 gap-8">
           <div className="flex gap-8">
             <div className="flex flex-col flex-1 gap-8">
-              {[dadosGraficoEner, dadosGraficoConc].map((data, idx) => (
-                <div key={idx} className="bg-white p-6 rounded-3xl shadow-lg h-[280px] flex flex-col">
-                  <h2 className="text-center font-semibold mb-4 font-serif text-gray-700 text-[20px]">
-                    {idx === 0 ? 'Status ENER' : 'Status CONC'}
-                  </h2>
-                  <div className="flex-1">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="status" tick={{ fill: '#4a4a4a' }} />
-                        <YAxis hide />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#4ade80">
-                          <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+              {[dadosGraficoEner, dadosGraficoConc].map((data, idx) => {
+                // Ref para capturar o container do gráfico
+                const cardRef = idx === 0 ? (el => window.graficoEnerCardRef = el) : undefined;
+                return (
+                  <div
+                    key={idx}
+                    ref={cardRef}
+                    className="bg-white rounded-3xl shadow-lg flex flex-col relative h-full w-full"
+                    style={idx === 0 ? {
+                      border: '4px solid #60a5fa',
+                      borderRadius: '1.5rem',
+                      minHeight: 220,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'flex-start',
+                      boxSizing: 'border-box',
+                      position: 'relative',
+                      padding: '0',
+                    } : {}}
+                  >
+                    {idx === 0 && (
+                      <button
+                        title="Copiar imagem do gráfico"
+                        className="btn-copiar-grafico"
+                        onClick={async e => {
+                          e.stopPropagation();
+                          const cardDiv = window.graficoEnerCardRef;
+                          if (!cardDiv) return;
+                          // Esconde o botão antes de capturar
+                          const btn = cardDiv.querySelector('.btn-copiar-grafico');
+                          if (btn) btn.style.visibility = 'hidden';
+                          const html2canvas = (await import('html2canvas')).default;
+                          html2canvas(cardDiv, {backgroundColor: null, useCORS: true, scale: 2, logging: false}).then((canvas) => {
+                            // Mostra o botão novamente
+                            if (btn) btn.style.visibility = 'visible';
+                            canvas.toBlob((blob) => {
+                              if (blob) {
+                                const item = new window.ClipboardItem({ 'image/png': blob });
+                                window.navigator.clipboard.write([item]);
+                              }
+                            });
+                          });
+                        }}
+                        style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, width: 32, height: 32, background: '#fff', borderRadius: 8, border: '2px solid #4ade80', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                      >
+                        {/* Ícone clássico de copiar (duas folhas) */}
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="6" y="6" width="9" height="12" rx="2" fill="#bbf7d0" stroke="#22c55e" strokeWidth="1.5" />
+                          <rect x="3" y="3" width="9" height="12" rx="2" fill="#fff" stroke="#22c55e" strokeWidth="1.2" />
+                        </svg>
+                      </button>
+                    )}
+                    <h2 className="text-center font-semibold font-serif text-gray-700 text-[20px] mt-2 mb-4" style={{margin: 0}}>
+                      {idx === 0 ? 'Status ENER' : 'Status CONC'}
+                    </h2>
+                    <div className="flex-1 p-6 flex flex-col">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="status" tick={{ fill: '#4a4a4a' }} />
+                          <YAxis hide />
+                          <Tooltip />
+                          <Bar dataKey="count" fill="#4ade80">
+                            <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex flex-col flex-1 gap-8">

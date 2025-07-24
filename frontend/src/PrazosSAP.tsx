@@ -95,7 +95,7 @@ export default function PrazosSAP() {
           style={{ width: 160, height: 48, backgroundColor: '#fff' }}
         >
           <span>Valor Total</span>
-          <span className="text-green-700 text-base font-semibold" style={{ fontWeight: 600 }}>
+          <span className="text-base font-semibold text-green-700" style={{ fontWeight: 600 }}>
             {formatarValorRS(
               Array.isArray(graficoSeccionalRS)
                 ? graficoSeccionalRS.reduce((acc, cur) => acc + (cur.totalRS || 0), 0)
@@ -103,16 +103,16 @@ export default function PrazosSAP() {
             )}
           </span>
         </div>
-        <h1 className="text-white text-2xl font-bold font-serif text-center flex-grow">
+        <h1 className="flex-grow font-serif text-2xl font-bold text-center text-white">
           Controle de Produção - Prazos SAP
         </h1>
         <div style={{ minWidth: 0, flex: '0 0 384px', display: 'flex', justifyContent: 'flex-end', gap: '12px', marginRight: '16px' }}>
           <div
-            className="rounded-full bg-gray-800 border-2 border-gray-700 shadow-3d flex flex-col items-center justify-center font-bold text-gray-100 text-lg"
+            className="flex flex-col items-center justify-center text-lg font-bold text-gray-100 bg-gray-800 border-2 border-gray-700 rounded-full shadow-3d"
             style={{ width: 160, height: 48, backgroundColor: '#fff' }}
           >
             <span>Valor Total</span>
-            <span className="text-green-700 text-base font-semibold" style={{ fontWeight: 600 }}>
+            <span className="text-base font-semibold text-green-700" style={{ fontWeight: 600 }}>
               {formatarValorRS(
                 Array.isArray(graficoSeccionalRS)
                   ? graficoSeccionalRS.reduce((acc, cur) => acc + (cur.totalRS || 0), 0)
@@ -121,11 +121,11 @@ export default function PrazosSAP() {
             </span>
           </div>
           <div
-            className="rounded-full bg-gray-800 border-2 border-gray-700 shadow-3d flex flex-col items-center justify-center font-bold text-gray-100 text-lg"
+            className="flex flex-col items-center justify-center text-lg font-bold text-gray-100 bg-gray-800 border-2 border-gray-700 rounded-full shadow-3d"
             style={{ width: 160, height: 48, backgroundColor: '#fff' }}
           >
             <span>Qtd de PEP</span>
-            <span className="text-green-700 text-base font-semibold" style={{ fontWeight: 600 }}>
+            <span className="text-base font-semibold text-green-700" style={{ fontWeight: 600 }}>
               {Array.isArray(graficoSeccionalRS)
                 ? graficoSeccionalRS.reduce((acc, cur) => acc + (cur.totalPEP || 0), 0)
                 : 0}
