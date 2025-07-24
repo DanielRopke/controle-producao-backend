@@ -1,4 +1,4 @@
-import React from 'react'
+
 
 /**
  * Componente de barra lateral para filtros da dashboard.

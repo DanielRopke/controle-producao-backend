@@ -1,5 +1,7 @@
 
 import React from 'react';
+// @ts-ignore
+import html2canvas from 'html2canvas';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LabelList, CartesianGrid
@@ -10,7 +12,7 @@ interface Props {
   /** Título do gráfico */
   titulo: string
   /** Dados do gráfico (status e contagem) */
-  dados: { status: string, count: number }[]
+  dados: Array<{ status: string; count: number; seccional?: string }>
   /** Cor da barra (opcional) */
   cor?: string
   /** Callback ao clicar em uma barra */
@@ -23,11 +25,11 @@ interface Props {
 export function GraficoBarras({ titulo, dados, cor = "#4ade80" }: Props) {
   // ...existing code...
   // Função para copiar imagem do quadrado grande
+  // Função para copiar imagem do gráfico
   const copiarImagemPadrao = async () => {
     if (!graficoRef.current) return;
-    const html2canvas = (await import('html2canvas')).default;
-    html2canvas(graficoRef.current, { backgroundColor: null }).then(canvas => {
-      canvas.toBlob(blob => {
+    html2canvas(graficoRef.current, {}).then((canvas: HTMLCanvasElement) => {
+      canvas.toBlob((blob: Blob | null) => {
         if (blob) {
           const item = new ClipboardItem({ 'image/png': blob });
           navigator.clipboard.write([item]);
@@ -43,19 +45,7 @@ export function GraficoBarras({ titulo, dados, cor = "#4ade80" }: Props) {
     setTimeout(() => setSelecionado(false), 800);
   };
 
-  // Função para copiar imagem do quadrado grande
-  const copiarImagem = async () => {
-    if (!graficoRef.current) return;
-    const html2canvas = (await import('html2canvas')).default;
-    html2canvas(graficoRef.current, { backgroundColor: null }).then(canvas => {
-      canvas.toBlob(blob => {
-        if (blob) {
-          const item = new ClipboardItem({ 'image/png': blob });
-          navigator.clipboard.write([item]);
-        }
-      });
-    });
-  };
+  // Removido copiarImagem não utilizado
 
   return (
     <div

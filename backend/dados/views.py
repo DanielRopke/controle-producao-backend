@@ -197,9 +197,15 @@ def status_servico_contagem(request):
         contagem = {}
         for row in data:
             status = row.get('status serviço') or row.get('STATUS SERVIÇO') or row.get('Status Serviço')
+            seccional = (row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or '').strip()
+            if not status or not seccional:
+                continue
+            status = status.strip()
             if not status:
                 continue
-            contagem[status.strip()] = contagem.get(status.strip(), 0) + 1
+            if status not in contagem:
+                contagem[status] = {}
+            contagem[status][seccional] = contagem[status].get(seccional, 0) + 1
         return Response(contagem)
     except Exception as e:
         return Response({'error': str(e)}, status=500)

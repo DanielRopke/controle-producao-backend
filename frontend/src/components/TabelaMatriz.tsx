@@ -21,18 +21,18 @@ export function TabelaMatriz({ dados }: Props) {
     <>
       <div style={{ height: 16 }} />
       <div
-        className="w-full flex flex-col gap-0 rounded-3xl"
+        className="flex flex-col w-full gap-0 rounded-3xl"
         style={{
           background: 'linear-gradient(135deg, #bbf7d0 0%, #a7f3d0 100%)',
           borderRadius: '1.5rem',
           boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.10)'
         }}
       >
-        <div className="rounded-t-3xl px-6 py-4" style={{ background: 'transparent', borderTopLeftRadius: '1.5rem', borderTopRightRadius: '1.5rem' }}>
+        <div className="px-6 py-4 rounded-t-3xl" style={{ background: 'transparent', borderTopLeftRadius: '1.5rem', borderTopRightRadius: '1.5rem' }}>
           <h2 className="text-center font-semibold font-serif text-gray-700 text-[20px] m-0">Matriz de Prazos SAP</h2>
         </div>
         <div
-          className="rounded-3xl p-0 w-full overflow-x-auto"
+          className="w-full p-0 overflow-x-auto rounded-3xl"
           style={{
             background: '#fff',
             borderRadius: '1.5rem',
@@ -40,7 +40,7 @@ export function TabelaMatriz({ dados }: Props) {
           }}
         >
           <table
-            className="min-w-full table-auto text-sm text-left text-gray-700 border-separate"
+            className="min-w-full text-sm text-left text-gray-700 border-separate table-auto"
             style={{ borderSpacing: 0, width: '100%' }}
           >
             <thead className="bg-gradient-to-r from-green-100 to-green-200">
@@ -65,7 +65,7 @@ export function TabelaMatriz({ dados }: Props) {
                     <td className="py-2 px-4 border border-[#d1fae5]" aria-label="Prazo">{item.prazo || '-'}</td>
                     <td className="py-2 px-4 border border-[#d1fae5]" aria-label="Data Conclusão">{item.dataConclusao || '-'}</td>
                     <td className="py-2 px-4 border border-[#d1fae5]" aria-label="Status SAP">
-                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">{item.statusSap || '-'}</span>
+                      <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">{item.statusSap || '-'}</span>
                     </td>
                     <td className="py-2 px-4 font-semibold text-green-700 border border-[#d1fae5]" aria-label="Valor">{item.valor || '-'}</td>
                   </tr>
