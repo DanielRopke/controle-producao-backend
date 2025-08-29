@@ -1,18 +1,23 @@
 import os
 from pathlib import Path
 import dj_database_url
+from dotenv import load_dotenv
 
 # Caminho base do projeto
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Carrega variáveis do .env na raiz do monorepo
+load_dotenv(BASE_DIR.parent / '.env')
+
 # Chave secreta segura (mantenha segredo em produção!)
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'troque-essa-chave-para-producao')
 
-# Debug baseado em variável de ambiente
-DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
+# Debug baseado em variável de ambiente (padrão True em dev)
+_dj_debug_env = os.getenv('DJANGO_DEBUG')
+DEBUG = (_dj_debug_env == 'True') if _dj_debug_env is not None else True
 
 # Domínios permitidos
-ALLOWED_HOSTS = ['controle-producao-backend.onrender.com', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['controle-producao-backend.onrender.com', 'localhost', '127.0.0.1', '0.0.0.0']
 
 # Aplicativos instalados
 INSTALLED_APPS = [

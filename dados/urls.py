@@ -10,6 +10,9 @@ urlpatterns = [
     path('defeitos/', views.defeitos),
     path('seccionais/', views.seccionais),
     path('status-sap-unicos/', views.status_sap_unicos),  # <-- NOVO ENDPOINT
+    path('status-ener-unicos/', views.status_ener_unicos),
+    path('status-conc-unicos/', views.status_conc_unicos),
+    path('status-servico-unicos/', views.status_servico_unicos),
     path('carteira_por_seccional/', views.carteira_por_seccional),
     path('status-ener-pep/', views.status_ener_pep),
     path('status-conc-pep/', views.status_conc_pep),
