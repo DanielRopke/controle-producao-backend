@@ -381,8 +381,8 @@ export default function PrazosSAP() {
 					"fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-gray-200 shadow-md overflow-y-auto z-50 transition-transform duration-300",
 					"lg:translate-x-0 lg:fixed lg:z-auto lg:h-[calc(100vh-4rem)]",
 					sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-				)}>
-					<div className="p-4 space-y-4 lg:p-6 lg:space-y-6">
+				)} style={{ direction: 'rtl' }}>
+					<div className="p-4 space-y-4 lg:p-6 lg:space-y-6" style={{ direction: 'ltr' }}>
 						<div className="space-y-3">
 							<h3 className="text-sm font-semibold tracking-wider text-gray-500 uppercase">Regiões</h3>
 							<div className="space-y-2">
