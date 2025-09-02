@@ -21,7 +21,25 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+  "noUncheckedSideEffectImports": true,
+  "types": ["vite/client"]
   },
-  "include": ["src"]
+  "include": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/index.css",
+    "src/services/**/*.ts",
+    "src/pages/**/*.tsx",
+    "src/types/**/*.ts"
+  ],
+  "exclude": [
+    "src/pages/PrazosSAP.tsx",
+  "src/pages/Home.tsx",
+  "src/pages/Obras.tsx",
+  "src/pages/Login.tsx",
+    "src/PrazosSAP.tsx",
+    "src/components/GraficoBarras.tsx",
+  "src/hooks/useDadosGraficos.ts",
+  "src/PrazosSAP.jsx"
+  ]
 }

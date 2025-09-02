@@ -1,5 +1,6 @@
 // Dashboard consolidado: conteúdo migrado da antiga PrazosSAP1
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -13,6 +14,9 @@ import { PEPSearch } from '../components/PEPSearch';
 import { cn } from "../lib/utils";
 import { getMatrizDados, getStatusEnerPep, getStatusConcPep, getStatusServicoContagem, getStatusSapUnicos, getTiposUnicos, getMesesConclusao } from '../services/api';
 import type { MatrizItem } from '../services/api';
+import { showToast } from '../components/toast';
+import LogoSetup from '../assets/LogoSetup1.png';
+import { FundoAnimado } from '../components/FundoAnimado';
 
 interface DashboardData {
 	statusENER: { name: string; value: number; qtd: number }[]; // Valor (R$) e quantidade
@@ -22,7 +26,17 @@ interface DashboardData {
 	matrix: { pep: string; prazo: string; dataConclusao: string; status: string; rs: number }[];
 }
 
+// Tipo mínimo para o renderer de rótulos das barras
+type BarLabelProps = {
+	x?: number | string;
+	y?: number | string;
+	width?: number | string;
+	value?: number | string;
+	index?: number;
+};
+
 export default function PrazosSAP() {
+	const navigate = useNavigate();
 	const [selectedRegion, setSelectedRegion] = useState<string>('all');
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [pepSearch, setPepSearch] = useState('');
@@ -42,6 +56,15 @@ export default function PrazosSAP() {
 	const [tiposList, setTiposList] = useState<string[]>([]);
 	const [mesesList, setMesesList] = useState<string[]>([]);
 
+	// Título da janela quando nesta página
+	useEffect(() => {
+		const prevTitle = document.title;
+		document.title = 'Prazos SAP';
+		return () => {
+			document.title = prevTitle;
+		};
+	}, []);
+
 	// Estados para filtros interativos
 	const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
 
@@ -51,11 +74,15 @@ export default function PrazosSAP() {
 		setSelectedStartDate(undefined);
 		setSelectedEndDate(undefined);
 		setPepSearch('');
+		setSelectedStatusSap('');
+		setSelectedTipo('');
+		setSelectedMes('');
+		showToast('Filtros limpos!');
 	};
 
 	const clearPepSearch = () => {
 		setPepSearch('');
-		console.log('[TOAST] Pesquisa PEP limpa!');
+		showToast('Pesquisa PEP limpa!');
 	};
 
 	// Ordenação
@@ -94,6 +121,64 @@ export default function PrazosSAP() {
 	const comparisonRef = useRef<HTMLDivElement>(null);
 	const statusCONCRef = useRef<HTMLDivElement>(null);
 	const reasonsRef = useRef<HTMLDivElement>(null);
+
+	// Renderizador de rótulos: quando a barra estiver ativa, usa preto e negrito
+	const makeLabelRenderer = (
+		dataArr: { name: string; qtd: number }[],
+		isActive: (name: string) => boolean,
+	) => (props: BarLabelProps) => {
+		const { x = 0, y = 0, width = 0, value, index = 0 } = props || {} as BarLabelProps;
+		const item = dataArr?.[index];
+		const active = item ? isActive(item.name) : false;
+		const cx = Number(x) + Number(width) / 2;
+		const cy = Number(y) - 6;
+		return (
+			<text
+				x={cx}
+				y={cy}
+				textAnchor="middle"
+				fill={active ? '#111827' : 'hsl(var(--foreground))'}
+				fontWeight={active ? 700 : 400}
+				fontSize={12}
+			>
+				{value}
+			</text>
+		);
+	};
+
+	// Formatação de valores curtos com 2 casas decimais e sufixos Mi/Mil
+	const numberFmt2 = React.useMemo(() => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), []);
+	const formatValorShort = (n: number) => {
+		const abs = Math.abs(n);
+		if (abs >= 1_000_000) return `${numberFmt2.format(n / 1_000_000)} Mi`;
+		if (abs >= 1_000) return `${numberFmt2.format(n / 1_000)} Mil`;
+		return numberFmt2.format(n);
+	};
+
+	// Renderizador para rótulos de Valor (barra azul) no comparativo
+	const makeValueLabelRenderer = (
+		dataArr: { name: string; value: number }[],
+		isActive: (name: string) => boolean,
+	) => (props: BarLabelProps) => {
+		const { x = 0, y = 0, width = 0, value, index = 0 } = props || {} as BarLabelProps;
+		const item = dataArr?.[index];
+		const active = item ? isActive(item.name) : false;
+		const cx = Number(x) + Number(width) / 2;
+		const cy = Number(y) - 6;
+		const v = Number(value) || 0;
+		return (
+			<text
+				x={cx}
+				y={cy}
+				textAnchor="middle"
+				fill={active ? '#111827' : 'hsl(var(--foreground))'}
+				fontWeight={active ? 700 : 400}
+				fontSize={12}
+			>
+				{formatValorShort(v)}
+			</text>
+		);
+	};
 
 	// Dados calculados
 	const filteredData = React.useMemo(() => {
@@ -136,13 +221,13 @@ export default function PrazosSAP() {
 				}
 				arr.push({ name: status, value: count, qtd: count });
 			});
-			return arr.sort((a, b) => b.value - a.value);
+			return arr.sort((a, b) => b.qtd - a.qtd);
 		};
 
-		const statusENER = hasEner ? (function() { const m = new Map<string, { valor: number; qtd: number }>(); for (const r of rowsForOthers) { const k = (r.statusEner || '').trim(); if (!k) continue; const v = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor || '0').replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')) || 0; const cur = m.get(k) || { valor: 0, qtd: 0 }; m.set(k, { valor: cur.valor + v, qtd: cur.qtd + 1 }); } return Array.from(m.entries()).map(([name, obj]) => ({ name, value: obj.valor, qtd: obj.qtd })).sort((a, b) => b.value - a.value); })() : sumFromMap(statusEnerMap);
-		const statusCONC = hasConc ? (function() { const m = new Map<string, { valor: number; qtd: number }>(); for (const r of rowsForOthers) { const k = (r.statusConc || '').trim(); if (!k) continue; const v = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor || '0').replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')) || 0; const cur = m.get(k) || { valor: 0, qtd: 0 }; m.set(k, { valor: cur.valor + v, qtd: cur.qtd + 1 }); } return Array.from(m.entries()).map(([name, obj]) => ({ name, value: obj.valor, qtd: obj.qtd })).sort((a, b) => b.value - a.value); })() : sumFromMap(statusConcMap);
-		const reasons = hasMotivos ? (function() { const m = new Map<string, { valor: number; qtd: number }>(); for (const r of rowsForOthers) { const k = (r.statusServico || '').trim(); if (!k) continue; const v = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor || '0').replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')) || 0; const cur = m.get(k) || { valor: 0, qtd: 0 }; m.set(k, { valor: cur.valor + v, qtd: cur.qtd + 1 }); } return Array.from(m.entries()).map(([name, obj]) => ({ name, value: obj.valor, qtd: obj.qtd })).sort((a, b) => b.value - a.value); })() : sumFromMap(reasonsMap);
-		const comparison = (function() { const m = new Map<string, { valor: number; qtd: number }>(); for (const r of rowsForComparison) { const s = (r.seccional || '').trim(); if (!s) continue; const v = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor || '0').replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')) || 0; const cur = m.get(s) || { valor: 0, qtd: 0 }; m.set(s, { valor: cur.valor + v, qtd: cur.qtd + 1 }); } return Array.from(m.entries()).map(([name, obj]) => ({ name, value: obj.valor, qtd: obj.qtd })).sort((a, b) => b.value - a.value); })();
+		const statusENER = hasEner ? (function() { const m = new Map<string, { valor: number; qtd: number }>(); for (const r of rowsForOthers) { const k = (r.statusEner || '').trim(); if (!k) continue; const v = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor || '0').replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')) || 0; const cur = m.get(k) || { valor: 0, qtd: 0 }; m.set(k, { valor: cur.valor + v, qtd: cur.qtd + 1 }); } return Array.from(m.entries()).map(([name, obj]) => ({ name, value: obj.valor, qtd: obj.qtd })).sort((a, b) => b.qtd - a.qtd); })() : sumFromMap(statusEnerMap);
+		const statusCONC = hasConc ? (function() { const m = new Map<string, { valor: number; qtd: number }>(); for (const r of rowsForOthers) { const k = (r.statusConc || '').trim(); if (!k) continue; const v = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor || '0').replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')) || 0; const cur = m.get(k) || { valor: 0, qtd: 0 }; m.set(k, { valor: cur.valor + v, qtd: cur.qtd + 1 }); } return Array.from(m.entries()).map(([name, obj]) => ({ name, value: obj.valor, qtd: obj.qtd })).sort((a, b) => b.qtd - a.qtd); })() : sumFromMap(statusConcMap);
+		const reasons = hasMotivos ? (function() { const m = new Map<string, { valor: number; qtd: number }>(); for (const r of rowsForOthers) { const k = (r.statusServico || '').trim(); if (!k) continue; const v = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor || '0').replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')) || 0; const cur = m.get(k) || { valor: 0, qtd: 0 }; m.set(k, { valor: cur.valor + v, qtd: cur.qtd + 1 }); } return Array.from(m.entries()).map(([name, obj]) => ({ name, value: obj.valor, qtd: obj.qtd })).sort((a, b) => b.qtd - a.qtd); })() : sumFromMap(reasonsMap);
+		const comparison = (function() { const m = new Map<string, { valor: number; qtd: number }>(); for (const r of rowsForComparison) { const s = (r.seccional || '').trim(); if (!s) continue; const v = typeof r.valor === 'number' ? r.valor : parseFloat(String(r.valor || '0').replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')) || 0; const cur = m.get(s) || { valor: 0, qtd: 0 }; m.set(s, { valor: cur.valor + v, qtd: cur.qtd + 1 }); } return Array.from(m.entries()).map(([name, obj]) => ({ name, value: obj.valor, qtd: obj.qtd })).sort((a, b) => b.qtd - a.qtd); })();
 
 		// 3) Linhas da matriz (após filtros), com sort
 		let tableRows: DashboardData['matrix'] = rowsForOthers.map(r => {
@@ -157,20 +242,49 @@ export default function PrazosSAP() {
 		});
 
 		if (sortConfig.key) {
+			// Helpers para ordenar datas em formato dd/mm/aaaa (ou outros parseáveis)
+			const parseDate = (s: string): number => {
+				if (!s) return Number.NaN;
+				const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+				if (m) {
+					const d = Number(m[1]);
+					const mo = Number(m[2]) - 1;
+					const y = Number(m[3]);
+					const dt = new Date(y, mo, d);
+					return dt.getTime();
+				}
+				const t = Date.parse(s);
+				return Number.isNaN(t) ? Number.NaN : t;
+			};
+
+			const compareNumbers = (x: number, y: number) => {
+				if (Number.isNaN(x) && Number.isNaN(y)) return 0;
+				if (Number.isNaN(x)) return 1; // valores vazios ao final
+				if (Number.isNaN(y)) return -1;
+				return x - y;
+			};
+
 			tableRows = [...tableRows].sort((a, b) => {
-				const aValue = a[sortConfig.key!];
-				const bValue = b[sortConfig.key!];
-				if (sortConfig.key === 'rs') {
-					return sortConfig.direction === 'asc'
-						? (aValue as number) - (bValue as number)
-						: (bValue as number) - (aValue as number);
-				} else {
-					const aStr = String(aValue).toLowerCase();
-					const bStr = String(bValue).toLowerCase();
-					if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
-					if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
-					return 0;
-				};
+				const key = sortConfig.key!;
+				const dir = sortConfig.direction === 'asc' ? 1 : -1;
+				const aValue = a[key];
+				const bValue = b[key];
+
+				if (key === 'rs') {
+					return dir * ((aValue as number) - (bValue as number));
+				}
+
+				if (key === 'prazo' || key === 'dataConclusao') {
+					const da = parseDate(String(aValue));
+					const db = parseDate(String(bValue));
+					return dir * compareNumbers(da, db);
+				}
+
+				const aStr = String(aValue).toLowerCase();
+				const bStr = String(bValue).toLowerCase();
+				if (aStr < bStr) return -1 * dir;
+				if (aStr > bStr) return 1 * dir;
+				return 0;
 			});
 		}
 
@@ -296,15 +410,15 @@ export default function PrazosSAP() {
 				if (blob) {
 					const item = new ClipboardItem({ 'image/png': blob });
 					navigator.clipboard.write([item]).then(() => {
-						console.log(`[TOAST] Imagem do gráfico ${chartName} copiada!`);
+						showToast(`Imagem do gráfico ${chartName} copiada!`);
 					}).catch(() => {
-						console.log(`[TOAST] Erro ao copiar imagem do gráfico ${chartName}`);
+						showToast(`Erro ao copiar imagem do gráfico ${chartName}`);
 					});
 				}
 			});
 		} catch (error) {
 			console.error('Erro ao capturar gráfico:', error);
-			console.log(`[TOAST] Erro ao copiar imagem do gráfico ${chartName}`);
+			showToast(`Erro ao copiar imagem do gráfico ${chartName}`);
 		}
 	};
 
@@ -320,7 +434,7 @@ export default function PrazosSAP() {
 		const workbook = XLSX.utils.book_new();
 		XLSX.utils.book_append_sheet(workbook, worksheet, 'Prazos SAP');
 		XLSX.writeFile(workbook, 'prazos_sap.xlsx');
-		console.log('[TOAST] Arquivo Excel exportado com sucesso!');
+		showToast('Arquivo Excel exportado com sucesso!');
 	};
 
 	// KPIs devem refletir os filtros atuais sobre as linhas usadas na tabela e outros gráficos (rowsForOthers)
@@ -328,9 +442,17 @@ export default function PrazosSAP() {
 	const totalPep = React.useMemo(() => filteredData.matrix.length, [filteredData.matrix.length]);
 
 	return (
-		<div className="min-h-screen lovable bg-background">
-			<header className="fixed top-0 left-0 right-0 z-50 bg-green-600 border-b border-green-400 shadow-md">
-				<div className="flex items-center justify-between h-16 px-4 lg:px-6">
+		<div className="relative z-10 min-h-screen bg-transparent lovable">
+			{/* Fundo animado em toda a página (fixo atrás do conteúdo) */}
+			<FundoAnimado />
+			<header className="fixed top-0 left-0 right-0 z-50 border-b border-green-500 shadow-md bg-gradient-to-r from-green-600 via-green-600/90 to-green-700">
+				<div className="relative flex items-center justify-between h-16 px-4 lg:px-6">
+					{/* Título centralizado */}
+					<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+						<h1 className="font-inter text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-wide leading-none text-white drop-shadow-[0_3px_6px_rgba(0,0,0,0.35)]">
+							Prazos SAP
+						</h1>
+					</div>
 					<div className="flex items-center gap-3 lg:gap-6">
 						<Button
 							variant="outline"
@@ -341,30 +463,36 @@ export default function PrazosSAP() {
 							<Menu className="w-4 h-4" />
 						</Button>
 						<div className="flex items-center gap-3">
-							<div className="bg-white text-green-600 px-3 lg:px-4 py-2 rounded-xl font-bold shadow-md text-center text-sm lg:text-base w-[100px] lg:w-[120px]">
-								setup
+							<div
+								className="bg-white px-3 lg:px-4 rounded-xl font-bold shadow-md text-center w-[172px] h-10 flex items-center justify-center overflow-hidden cursor-pointer hover:shadow-lg hover:bg-gray-50"
+								onClick={() => navigate('/obras')}
+								title="Ir para Obras"
+								role="button"
+								tabIndex={0}
+							>
+								<img src={LogoSetup} alt="Grupo Setup" className="object-contain w-full h-auto max-h-6" />
 							</div>
 							<Button
 								variant="outline"
 								size="sm"
 								onClick={clearFilters}
-								className="items-center hidden gap-2 text-gray-700 transition-all duration-200 bg-white border-gray-300 shadow-md sm:flex rounded-xl hover:shadow-lg hover:bg-gray-50"
+								title="Limpar filtros"
+								className="flex items-center justify-center w-10 h-10 p-0 text-gray-700 transition-all duration-200 bg-white border-gray-300 shadow-md rounded-xl hover:shadow-lg hover:bg-gray-50"
 							>
 								<RotateCcw className="w-4 h-4" />
-								<span className="hidden md:inline">Limpar Filtros</span>
 							</Button>
 						</div>
 					</div>
 					<div className="flex items-center gap-2 lg:gap-4">
 						<div className="flex items-center gap-2 lg:gap-3">
 							<span className="hidden text-xs text-white lg:text-sm sm:inline">Valor Total</span>
-							<div className="px-2 py-1 text-sm font-semibold text-green-600 bg-white rounded-lg shadow-md lg:px-4 lg:py-2 lg:rounded-xl lg:text-base">
-								R$ {totalValue.toLocaleString('pt-BR', { notation: 'compact' })}
+							<div className="px-2 py-1 text-sm font-semibold text-green-600 bg-white rounded-lg shadow-md lg:px-4 lg:py-2 lg:rounded-xl lg:text-base w-[105px] text-center whitespace-nowrap">
+								R$ {formatValorShort(totalValue)}
 							</div>
 						</div>
 						<div className="flex items-center gap-2 lg:gap-3">
 							<span className="hidden text-xs text-white lg:text-sm sm:inline">PEP</span>
-							<div className="px-2 py-1 text-sm font-semibold text-green-600 bg-white rounded-lg shadow-md lg:px-4 lg:py-2 lg:rounded-xl lg:text-base">
+							<div className="px-2 py-1 text-sm font-semibold text-green-600 bg-white rounded-lg shadow-md lg:px-4 lg:py-2 lg:rounded-xl lg:text-base w-[105px] text-center whitespace-nowrap">
 								{totalPep}
 							</div>
 						</div>
@@ -383,17 +511,10 @@ export default function PrazosSAP() {
 					sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
 				)} style={{ direction: 'rtl' }}>
 					<div className="p-4 space-y-4 lg:p-6 lg:space-y-6" style={{ direction: 'ltr' }}>
+						{/* Logo removido do sidebar para manter apenas no header */}
 						<div className="space-y-3">
 							<h3 className="text-sm font-semibold tracking-wider text-gray-500 uppercase">Regiões</h3>
 							<div className="space-y-2">
-								<Button
-									variant={selectedRegion === 'all' ? "default" : "outline"}
-									onClick={() => { setSelectedRegion('all'); setSidebarOpen(false); }}
-									className="justify-start w-full text-sm transition-all duration-200 shadow-md rounded-xl hover:shadow-lg"
-									size="sm"
-								>
-									Todas as Regiões
-								</Button>
 								{regions.map((region) => (
 									<Button
 										key={region}
@@ -411,6 +532,40 @@ export default function PrazosSAP() {
 							</div>
 						</div>
 
+						<div className="pt-4 space-y-3 border-t border-gray-200">
+							<h3 className="text-sm font-semibold tracking-wider text-gray-500 uppercase">Filtros</h3>
+							<select
+								value={selectedStatusSap}
+								onChange={(e) => setSelectedStatusSap(e.target.value)}
+								className={`w-full h-10 px-3 text-sm border rounded-xl shadow-md transition-all duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${selectedStatusSap ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-900 border-gray-200'}`}
+							>
+								<option value="">Status SAP</option>
+								{statusSapList.map((s) => (
+									<option key={s} value={s}>{s}</option>
+								))}
+							</select>
+							<select
+								value={selectedTipo}
+								onChange={(e) => setSelectedTipo(e.target.value)}
+								className={`w-full h-10 px-3 text-sm border rounded-xl shadow-md transition-all duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${selectedTipo ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-900 border-gray-200'}`}
+							>
+								<option value="">Tipo</option>
+								{tiposList.map((t) => (
+									<option key={t} value={t}>{t}</option>
+								))}
+							</select>
+							<select
+								value={selectedMes}
+								onChange={(e) => setSelectedMes(e.target.value)}
+								className={`w-full h-10 px-3 text-sm border rounded-xl shadow-md transition-all duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${selectedMes ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-900 border-gray-200'}`}
+							>
+								<option value="">Mês</option>
+								{mesesList.map((m) => (
+									<option key={m} value={m}>{m}</option>
+								))}
+							</select>
+						</div>
+
 						<div className="pt-4 border-t border-gray-200">
 							<DateRangeFilter
 								startDate={selectedStartDate}
@@ -423,40 +578,6 @@ export default function PrazosSAP() {
 						<div className="pt-4 border-t border-gray-200">
 							<PEPSearch searchValue={pepSearch} onSearchChange={setPepSearch} onClearSearch={clearPepSearch} />
 						</div>
-
-						<div className="pt-4 space-y-3 border-t border-gray-200">
-							<h3 className="text-sm font-semibold tracking-wider text-gray-500 uppercase">Filtros</h3>
-							<select
-								value={selectedStatusSap}
-								onChange={(e) => setSelectedStatusSap(e.target.value)}
-								className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg"
-							>
-								<option value="">Status SAP</option>
-								{statusSapList.map((s) => (
-									<option key={s} value={s}>{s}</option>
-								))}
-							</select>
-							<select
-								value={selectedTipo}
-								onChange={(e) => setSelectedTipo(e.target.value)}
-								className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg"
-							>
-								<option value="">Tipo</option>
-								{tiposList.map((t) => (
-									<option key={t} value={t}>{t}</option>
-								))}
-							</select>
-							<select
-								value={selectedMes}
-								onChange={(e) => setSelectedMes(e.target.value)}
-								className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg"
-							>
-								<option value="">Mês</option>
-								{mesesList.map((m) => (
-									<option key={m} value={m}>{m}</option>
-								))}
-							</select>
-						</div>
 					</div>
 				</aside>
 
@@ -466,7 +587,13 @@ export default function PrazosSAP() {
 							<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.02] hover:bg-gradient-card-hover overflow-hidden" ref={statusENERRef} tabIndex={0}>
 								<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
 									<CardTitle className="text-lg font-semibold text-secondary-foreground">Status ENER</CardTitle>
-									<Button variant="outline" size="sm" onClick={() => copyChartImage(statusENERRef, 'Status ENER')} className="w-8 h-8 p-0 transition-all duration-200 rounded-lg shadow-button hover:shadow-button-hover bg-gradient-button hover:bg-gradient-button/80" title="Copiar imagem (ou clique no gráfico e Ctrl+C)">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => copyChartImage(statusENERRef, 'Status ENER')}
+										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+										title="Copiar imagem (ou clique no gráfico e Ctrl+C)"
+									>
 										<Copy className="w-4 h-4" />
 									</Button>
 								</CardHeader>
@@ -477,12 +604,15 @@ export default function PrazosSAP() {
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
 												<XAxis dataKey="name" fontSize={12} tickMargin={8} />
 												<YAxis fontSize={12} />
-												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Valor']} />
-												<Bar dataKey="value" fill="url(#chartGradient)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [value.toLocaleString('pt-BR'), 'Qtd']} />
+												<Bar dataKey="qtd" fill="url(#chartGradient)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
 													{filteredData.statusENER.map((entry, index) => (
 														<Cell key={`cell-${index}`} onClick={() => handleChartClick('statusENER', entry.name)} fill={activeFilters.statusENER === entry.name ? "hsl(var(--primary))" : "url(#chartGradient)"} stroke={activeFilters.statusENER === entry.name ? "hsl(var(--primary-foreground))" : "none"} strokeWidth={activeFilters.statusENER === entry.name ? 2 : 0} />
 													))}
-													<LabelList dataKey="qtd" position="top" fontSize={12} fill="hsl(var(--foreground))" fontWeight="semibold" />
+													<LabelList dataKey="qtd" content={makeLabelRenderer(
+														filteredData.statusENER,
+														(name: string) => activeFilters.statusENER === name,
+													)} />
 												</Bar>
 												<defs>
 													<linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
@@ -500,19 +630,37 @@ export default function PrazosSAP() {
 							<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.02] hover:bg-gradient-card-hover overflow-hidden" ref={comparisonRef} tabIndex={0}>
 								<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
 									<CardTitle className="text-lg font-semibold text-secondary-foreground">Comparativo por Região</CardTitle>
-									<Button variant="outline" size="sm" onClick={() => copyChartImage(comparisonRef, 'Comparativo')} className="w-8 h-8 p-0 transition-all duration-200 rounded-lg shadow-button hover:shadow-button-hover bg-gradient-button hover:bg-gradient-button/80" title="Copiar imagem (ou clique no gráfico e Ctrl+C)">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => copyChartImage(comparisonRef, 'Comparativo')}
+										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+										title="Copiar imagem (ou clique no gráfico e Ctrl+C)"
+									>
 										<Copy className="w-4 h-4" />
 									</Button>
 								</CardHeader>
 								<CardContent className="p-4">
 									<ChartContainer config={{ value: { label: "Valor (R$)", color: "hsl(var(--primary))" } }} className="h-64 sm:h-72 md:h-80 lg:h-[calc((100vh-20rem)/2)] lg:max-h-[350px] w-full">
 										<ResponsiveContainer width="100%" height="100%">
-											<BarChart data={filteredData.comparison} margin={{ top: 20, right: 15, bottom: 50, left: 15 }}>
+											<BarChart data={filteredData.comparison} margin={{ top: 20, right: 20, bottom: 50, left: 20 }} barGap={4} barCategoryGap={16}>
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
 												<XAxis dataKey="name" fontSize={12} tickMargin={8} />
-												<YAxis fontSize={12} />
-												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Valor']} />
-												<Bar dataKey="value" fill="url(#chartGreenGradientComparison)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+												<YAxis yAxisId="left" fontSize={12} />
+												<YAxis yAxisId="right" orientation="right" fontSize={12} hide />
+												<Tooltip
+													contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }}
+													formatter={(value, _name, item) => {
+														const num = typeof value === 'number' ? value : Number(value) || 0;
+														// item pode ser Payload | Payload[]; tratamos a primeira ocorrência
+														type TP = { dataKey?: string | number } | undefined;
+														const payload = (Array.isArray(item) ? item[0] : item) as TP;
+														const dataKey = payload && payload.dataKey;
+														if (dataKey === 'value') return [`R$ ${num.toLocaleString('pt-BR')}`, 'Valor'];
+														return [num.toLocaleString('pt-BR'), 'Qtd'];
+													}}
+												/>
+												<Bar yAxisId="left" dataKey="qtd" fill="url(#chartGreenGradientComparison)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
 													{filteredData.comparison.map((entry, index) => {
 														const highlight = activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : '');
 														const isHighlighted = highlight && highlight === entry.name;
@@ -526,13 +674,46 @@ export default function PrazosSAP() {
 															/>
 														);
 													})}
-													<LabelList dataKey="qtd" position="top" fontSize={12} fill="hsl(var(--foreground))" fontWeight="semibold" />
+													<LabelList dataKey="qtd" content={makeLabelRenderer(
+														filteredData.comparison,
+														(name: string) => {
+															const highlight = activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : '');
+															return highlight === name;
+														},
+													)} />
+												</Bar>
+												<Bar yAxisId="right" dataKey="value" fill="url(#chartBlueGradientValue)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+													{filteredData.comparison.map((entry, index) => {
+														const highlight = activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : '');
+														const isHighlighted = highlight && highlight === entry.name;
+														return (
+															<Cell
+																key={`cellv-${index}`}
+																onClick={() => handleChartClick('comparison', entry.name)}
+																fill={isHighlighted ? "#1e3a8a" : "url(#chartBlueGradientValue)"}
+																stroke={isHighlighted ? "#0b173d" : "none"}
+																strokeWidth={isHighlighted ? 2 : 0}
+															/>
+														);
+													})}
+													<LabelList dataKey="value" content={makeValueLabelRenderer(
+														filteredData.comparison,
+														(name: string) => {
+															const highlight = activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : '');
+															return highlight === name;
+														},
+													)} />
 												</Bar>
 												<defs>
 													<linearGradient id="chartGreenGradientComparison" x1="0" y1="0" x2="0" y2="1">
 														<stop offset="0%" stopColor="hsl(142 90% 45%)" />
 														<stop offset="50%" stopColor="hsl(142 85% 42%)" />
 														<stop offset="100%" stopColor="hsl(142 76% 36%)" />
+													</linearGradient>
+													<linearGradient id="chartBlueGradientValue" x1="0" y1="0" x2="0" y2="1">
+														<stop offset="0%" stopColor="#3b82f6" />
+														<stop offset="50%" stopColor="#1d4ed8" />
+														<stop offset="100%" stopColor="#1e3a8a" />
 													</linearGradient>
 												</defs>
 											</BarChart>
@@ -544,7 +725,13 @@ export default function PrazosSAP() {
 							<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.02] hover:bg-gradient-card-hover overflow-hidden" ref={statusCONCRef} tabIndex={0}>
 								<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
 									<CardTitle className="text-lg font-semibold text-secondary-foreground">Status CONC</CardTitle>
-									<Button variant="outline" size="sm" onClick={() => copyChartImage(statusCONCRef, 'Status CONC')} className="w-8 h-8 p-0 transition-all duration-200 rounded-lg shadow-button hover:shadow-button-hover bg-gradient-button hover:bg-gradient-button/80" title="Copiar imagem (ou clique no gráfico e Ctrl+C)">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => copyChartImage(statusCONCRef, 'Status CONC')}
+										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+										title="Copiar imagem (ou clique no gráfico e Ctrl+C)"
+									>
 										<Copy className="w-4 h-4" />
 									</Button>
 								</CardHeader>
@@ -555,12 +742,15 @@ export default function PrazosSAP() {
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
 												<XAxis dataKey="name" fontSize={12} tickMargin={8} />
 												<YAxis fontSize={12} />
-												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Valor']} />
-												<Bar dataKey="value" fill="url(#chartGreenGradientConc)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [value.toLocaleString('pt-BR'), 'Qtd']} />
+												<Bar dataKey="qtd" fill="url(#chartGreenGradientConc)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
 													{filteredData.statusCONC.map((entry, index) => (
 														<Cell key={`cell-${index}`} onClick={() => handleChartClick('statusCONC', entry.name)} fill={activeFilters.statusCONC === entry.name ? "hsl(var(--primary))" : "url(#chartGreenGradientConc)"} stroke={activeFilters.statusCONC === entry.name ? "hsl(var(--primary-foreground))" : "none"} strokeWidth={activeFilters.statusCONC === entry.name ? 2 : 0} />
 													))}
-													<LabelList dataKey="qtd" position="top" fontSize={12} fill="hsl(var(--foreground))" fontWeight="semibold" />
+													<LabelList dataKey="qtd" content={makeLabelRenderer(
+														filteredData.statusCONC,
+														(name: string) => activeFilters.statusCONC === name,
+													)} />
 												</Bar>
 												<defs>
 													<linearGradient id="chartGreenGradientConc" x1="0" y1="0" x2="0" y2="1">
@@ -578,7 +768,13 @@ export default function PrazosSAP() {
 							<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.02] hover:bg-gradient-card-hover overflow-hidden" ref={reasonsRef} tabIndex={0}>
 								<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
 									<CardTitle className="text-lg font-semibold text-secondary-foreground">Motivos</CardTitle>
-									<Button variant="outline" size="sm" onClick={() => copyChartImage(reasonsRef, 'Motivos')} className="w-8 h-8 p-0 transition-all duration-200 rounded-lg shadow-button hover:shadow-button-hover bg-gradient-button hover:bg-gradient-button/80" title="Copiar imagem (ou clique no gráfico e Ctrl+C)">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => copyChartImage(reasonsRef, 'Motivos')}
+										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+										title="Copiar imagem (ou clique no gráfico e Ctrl+C)"
+									>
 										<Copy className="w-4 h-4" />
 									</Button>
 								</CardHeader>
@@ -589,12 +785,15 @@ export default function PrazosSAP() {
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
 												<XAxis dataKey="name" fontSize={12} tickMargin={8} />
 												<YAxis fontSize={12} />
-												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Valor']} />
-												<Bar dataKey="value" fill="url(#chartGreenGradientReasons)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [value.toLocaleString('pt-BR'), 'Qtd']} />
+												<Bar dataKey="qtd" fill="url(#chartGreenGradientReasons)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
 													{filteredData.reasons.map((entry, index) => (
 														<Cell key={`cell-${index}`} onClick={() => handleChartClick('reasons', entry.name)} fill={activeFilters.reasons === entry.name ? "hsl(var(--primary))" : "url(#chartGreenGradientReasons)"} stroke={activeFilters.reasons === entry.name ? "hsl(var(--primary-foreground))" : "none"} strokeWidth={activeFilters.reasons === entry.name ? 2 : 0} />
 													))}
-													<LabelList dataKey="qtd" position="top" fontSize={12} fill="hsl(var(--foreground))" fontWeight="semibold" />
+													<LabelList dataKey="qtd" content={makeLabelRenderer(
+														filteredData.reasons,
+														(name: string) => activeFilters.reasons === name,
+													)} />
 												</Bar>
 												<defs>
 													<linearGradient id="chartGreenGradientReasons" x1="0" y1="0" x2="0" y2="1">
@@ -614,7 +813,12 @@ export default function PrazosSAP() {
 					<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.01]">
 						<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
 							<CardTitle className="text-lg font-semibold text-secondary-foreground">Matriz de Prazos SAP</CardTitle>
-							<Button variant="outline" size="sm" onClick={handleExportExcel} className="flex items-center gap-2 transition-all duration-200 rounded-lg shadow-button hover:shadow-button-hover bg-gradient-button hover:bg-gradient-button/80">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleExportExcel}
+								className="flex items-center gap-2 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+							>
 								<Copy className="w-4 h-4" />
 								Exportar Excel
 							</Button>
@@ -626,6 +830,12 @@ export default function PrazosSAP() {
 										<TableRow className="bg-gray-50 hover:bg-gray-100">
 											<TableHead className="font-semibold text-gray-700 transition-colors cursor-pointer select-none hover:bg-gray-200" onClick={() => handleSort('pep')}>
 												<div className="flex items-center gap-2">PEP {getSortIcon('pep')}</div>
+											</TableHead>
+											<TableHead className="font-semibold text-gray-700 transition-colors cursor-pointer select-none hover:bg-gray-200" onClick={() => handleSort('prazo')}>
+												<div className="flex items-center gap-2">Prazo {getSortIcon('prazo')}</div>
+											</TableHead>
+											<TableHead className="font-semibold text-gray-700 transition-colors cursor-pointer select-none hover:bg-gray-200" onClick={() => handleSort('dataConclusao')}>
+												<div className="flex items-center gap-2">Data Conclusão {getSortIcon('dataConclusao')}</div>
 											</TableHead>
 											<TableHead className="font-semibold text-gray-700 transition-colors cursor-pointer select-none hover:bg-gray-200" onClick={() => handleSort('status')}>
 												<div className="flex items-center gap-2">Status SAP {getSortIcon('status')}</div>
@@ -639,6 +849,8 @@ export default function PrazosSAP() {
 										{filteredData.matrix.map((row, index) => (
 											<TableRow key={index} className={cn("cursor-pointer transition-all duration-200 select-none", selectedMatrixRow === row.pep ? "bg-green-50 border-l-4 border-l-green-600 shadow-md hover:bg-green-100" : "hover:bg-gray-50")} onClick={() => setSelectedMatrixRow(row.pep)}>
 												<TableCell className="font-mono text-sm">{row.pep}</TableCell>
+												<TableCell className="text-sm">{row.prazo}</TableCell>
+												<TableCell className="text-sm">{row.dataConclusao}</TableCell>
 												<TableCell>
 													<span className={`px-3 py-1 rounded-full text-xs font-medium ${row.status === 'Concluído' ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-yellow-100 text-yellow-800 border border-yellow-300'}`}>
 														{row.status}

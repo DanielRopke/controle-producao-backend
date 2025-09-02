@@ -49,30 +49,3 @@ def get_sheet(sheet_name):
         import traceback
         traceback.print_exc()
         raise
-
-
-def get_gspread_client():
-    """
-    Retorna um cliente gspread autenticado usando a variável de ambiente
-    GOOGLE_SHEETS_CREDENTIALS_JSON_BASE64.
-    """
-    try:
-        credentials_base64 = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON_BASE64")
-        if not credentials_base64:
-            raise Exception("Variável GOOGLE_SHEETS_CREDENTIALS_JSON_BASE64 não encontrada")
-
-        credentials_json = base64.b64decode(credentials_base64).decode("utf-8")
-        credentials_info = json.loads(credentials_json)
-
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-        ]
-        credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
-        client = gspread.authorize(credentials)
-        return client
-    except Exception as e:
-        print("[get_gspread_client] Erro ao criar cliente gspread:", e)
-        import traceback
-        traceback.print_exc()
-        raise

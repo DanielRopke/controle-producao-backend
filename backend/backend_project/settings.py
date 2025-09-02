@@ -1,27 +1,18 @@
 import os
 from pathlib import Path
 import dj_database_url
-from dotenv import load_dotenv
 
 # Caminho base do projeto
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Carrega variáveis do .env na raiz do monorepo
-load_dotenv(BASE_DIR.parent / '.env')
-
 # Chave secreta segura (mantenha segredo em produção!)
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'troque-essa-chave-para-producao')
 
-# Debug baseado em variável de ambiente (padrão True em dev)
-_dj_debug_env = os.getenv('DJANGO_DEBUG')
-DEBUG = (_dj_debug_env == 'True') if _dj_debug_env is not None else True
+# Debug baseado em variável de ambiente
+DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
-# Domínios permitidos (por env, com fallback)
-_allowed_hosts_env = os.getenv('ALLOWED_HOSTS')
-if _allowed_hosts_env:
-    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
-else:
-    ALLOWED_HOSTS = ['controle-producao-backend.onrender.com', 'localhost', '127.0.0.1', '0.0.0.0']
+# Domínios permitidos (env > default)
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'controle-producao-backend.onrender.com,localhost,127.0.0.1').split(',') if h.strip()]
 
 # Aplicativos instalados
 INSTALLED_APPS = [
@@ -77,10 +68,9 @@ TEMPLATES = [
 WSGI_APPLICATION = 'backend_project.wsgi.application'
 
 # Banco de dados com fallback para SQLite
-_db_url = os.getenv('DATABASE_URL')
 DATABASES = {
     'default': dj_database_url.config(
-        default=_db_url or f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
         conn_max_age=600
     )
 }
@@ -101,30 +91,18 @@ CORS_ALLOW_METHODS = list(default_methods) + [
     'OPTIONS',
 ]
 
-_cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS')
-if _cors_origins_env:
-    CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins_env.split(',') if o.strip()]
+FRONTEND_ORIGINS_ENV = os.getenv('FRONTEND_ORIGINS', '')
+FRONTEND_ORIGINS_LIST = [o.strip() for o in FRONTEND_ORIGINS_ENV.split(',') if o.strip()]
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOWED_ORIGINS = FRONTEND_ORIGINS_LIST or [
+        "http://localhost:5173",
+    ]
 else:
-    if DEBUG:
-        CORS_ALLOW_ALL_ORIGINS = True
-        CORS_ALLOWED_ORIGINS = [
-            "http://localhost:5173",
-            "https://www.controlesetup.com.br",
-            "https://controle-producao-frontend.vercel.app",
-        ]
-    else:
-        CORS_ALLOW_ALL_ORIGINS = False
-        CORS_ALLOWED_ORIGINS = [
-            "https://www.controlesetup.com.br",
-            "https://controle-producao-frontend.vercel.app",
-            "http://localhost:5173",
-        ]
-
-# CSRF trusted origins via env (opcional)
-_csrf_env = os.getenv('CSRF_TRUSTED_ORIGINS')
-if _csrf_env:
-    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_env.split(',') if o.strip()]
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = FRONTEND_ORIGINS_LIST or [
+        "https://www.controlesetup.com.br",
+    ]
 
 # Idioma e fuso horário
 LANGUAGE_CODE = 'pt-br'
@@ -139,8 +117,7 @@ STATIC_URL = '/static/'
 # LOCAL ONDE O COLLECTSTATIC VAI JUNTAR OS ARQUIVOS
 STATIC_ROOT = os.path.abspath(os.path.join(BASE_DIR, 'staticfiles'))
 
-# ✅ DEBUG: Verificar se STATIC_ROOT está sendo montado corretamente
-print("STATIC_ROOT DEFINIDO COMO:", STATIC_ROOT)  # Debug
+# Evitar prints em produção
 
 # DURANTE O DESENVOLVIMENTO (opcional)
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]

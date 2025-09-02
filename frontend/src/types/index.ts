@@ -15,6 +15,9 @@ export type SeccionalData = {
   totalRS: number;
   totalPEP: number;
   scaledPEP: number;
+  mes: string;
+  statusSap?: string;
+  tipo?: string;
 };
 
 export type MatrizItem = {

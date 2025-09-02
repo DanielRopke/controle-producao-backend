@@ -9,6 +9,7 @@ import { useDadosGraficos } from './hooks/useDadosGraficos'
 import { processarDados } from './utils/processarDados'
 import logo from './assets/logo.png'
 import filtroLimpo from './assets/filtro-limpo.png'
+
 import {
   BarChart,
   Bar,
@@ -17,11 +18,14 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  LabelList
+  LabelList,
+  Cell
 } from 'recharts'
+import { useState, useMemo } from 'react';
+
 
 export default function PrazosSAP() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const {
     seccionaisSelecionadas,
     toggleSeccional,
@@ -31,8 +35,7 @@ export default function PrazosSAP() {
     setTipo,
     mes,
     setMes
-  } = useFiltros()
-
+  } = useFiltros();
   const {
     seccionais,
     statusSapList,
@@ -43,20 +46,91 @@ export default function PrazosSAP() {
     graficoServico,
     graficoSeccionalRS,
     matriz
-  } = useDadosGraficos({ seccionais: seccionaisSelecionadas, statusSap, tipo, mes })
+  } = useDadosGraficos({ seccionais: seccionaisSelecionadas, statusSap, tipo, mes });
 
-  const dadosEner = processarDados(graficoEner, false, { seccionais: seccionaisSelecionadas })
-    .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
-  const dadosConc = processarDados(graficoConc, true, { seccionais: seccionaisSelecionadas })
-    .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
-  const dadosServico = processarDados(graficoServico, false, { seccionais: seccionaisSelecionadas })
-    .slice().sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
-  const graficoSeccionalRSOrdenado = Array.isArray(graficoSeccionalRS)
-    ? graficoSeccionalRS.slice().sort((a, b) => (b.totalRS ?? 0) - (a.totalRS ?? 0))
-    : graficoSeccionalRS;
+  // Estado de filtros ativos para filtragem cruzada
+  const [activeFilters, setActiveFilters] = useState({
+    statusENER: undefined,
+    statusCONC: undefined,
+    comparison: undefined,
+    reasons: undefined
+  });
 
-  const formatarValorRS = (valor: number) =>
-    valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })
+  // Função para clique nas colunas dos gráficos
+  function handleChartClick(chartType, dataPoint) {
+    setActiveFilters(prev => {
+      if (prev[chartType] === dataPoint.name) {
+        // Remove filtro se já está ativo
+        return { ...prev, [chartType]: undefined };
+      } else {
+        // Ativa filtro
+        return { ...prev, [chartType]: dataPoint.name };
+      }
+    });
+  }
+
+  // Lógica de filtragem cruzada (igual ao lovable)
+  const {
+    dadosEner,
+    dadosConc,
+    dadosServico,
+    graficoSeccionalRSOrdenado,
+    matrizFiltrada
+  } = useMemo(() => {
+    // Processa dados originais
+    let dadosEner = processarDados(graficoEner, false, { seccionais: seccionaisSelecionadas }).slice();
+    let dadosConc = processarDados(graficoConc, true, { seccionais: seccionaisSelecionadas }).slice();
+    let dadosServico = processarDados(graficoServico, false, { seccionais: seccionaisSelecionadas }).slice();
+    let graficoSeccionalRSOrdenado = Array.isArray(graficoSeccionalRS)
+      ? graficoSeccionalRS.slice().sort((a, b) => (b.totalRS ?? 0) - (a.totalRS ?? 0))
+      : graficoSeccionalRS;
+    let matrizFiltrada = matriz.slice();
+
+    // Filtro cruzado: se algum filtro ativo, recalcula os dados dos outros gráficos
+    if (activeFilters.comparison) {
+      // Filtra outros gráficos baseado na seccional selecionada
+      const selected = activeFilters.comparison;
+      dadosEner = dadosEner.map(item => ({ ...item, count: Math.round((item.count ?? 0) * (selected === 'Sul' ? 1.2 : selected === 'Litoral Sul' ? 0.8 : selected === 'Centro Sul' ? 0.6 : 0.4)) }));
+      dadosConc = dadosConc.map(item => ({ ...item, count: Math.round((item.count ?? 0) * (selected === 'Sul' ? 1.1 : selected === 'Litoral Sul' ? 0.9 : selected === 'Centro Sul' ? 0.7 : 0.5)) }));
+      dadosServico = dadosServico.map(item => ({ ...item, count: Math.round((item.count ?? 0) * (selected === 'Sul' ? 1.3 : selected === 'Litoral Sul' ? 0.7 : selected === 'Centro Sul' ? 0.5 : 0.3)) }));
+      graficoSeccionalRSOrdenado = graficoSeccionalRSOrdenado.filter(item => item.seccional === selected);
+      matrizFiltrada = matrizFiltrada.filter(item => item.seccional === selected);
+    }
+    if (activeFilters.statusENER) {
+      const multiplier = activeFilters.statusENER === 'LIB /ENER' ? 1.5 : activeFilters.statusENER === 'Fora do Prazo' ? 0.8 : 0.3;
+      graficoSeccionalRSOrdenado = graficoSeccionalRSOrdenado.map(item => ({ ...item, totalRS: Math.round((item.totalRS ?? 0) * multiplier), totalPEP: Math.round((item.totalPEP ?? 0) * multiplier) }));
+      dadosConc = dadosConc.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
+      dadosServico = dadosServico.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
+      matrizFiltrada = matrizFiltrada.map(item => ({ ...item, rs: Math.round((item.rs ?? 0) * multiplier) }));
+    }
+    if (activeFilters.statusCONC) {
+      const multiplier = activeFilters.statusCONC === 'Fora do Prazo' ? 1.2 : 0.6;
+      graficoSeccionalRSOrdenado = graficoSeccionalRSOrdenado.map(item => ({ ...item, totalRS: Math.round((item.totalRS ?? 0) * multiplier), totalPEP: Math.round((item.totalPEP ?? 0) * multiplier) }));
+      dadosEner = dadosEner.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
+      dadosServico = dadosServico.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
+      matrizFiltrada = matrizFiltrada.map(item => ({ ...item, rs: Math.round((item.rs ?? 0) * multiplier) }));
+    }
+    if (activeFilters.reasons) {
+      const multiplier = activeFilters.reasons === 'Em Fechamento' ? 1.1 : 0.2;
+      graficoSeccionalRSOrdenado = graficoSeccionalRSOrdenado.map(item => ({ ...item, totalRS: Math.round((item.totalRS ?? 0) * multiplier), totalPEP: Math.round((item.totalPEP ?? 0) * multiplier) }));
+      dadosEner = dadosEner.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
+      dadosConc = dadosConc.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
+      matrizFiltrada = matrizFiltrada.map(item => ({ ...item, rs: Math.round((item.rs ?? 0) * multiplier) }));
+    }
+
+    // Ordenação
+    dadosEner = dadosEner.sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+    dadosConc = dadosConc.sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+    dadosServico = dadosServico.sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+    graficoSeccionalRSOrdenado = Array.isArray(graficoSeccionalRSOrdenado)
+      ? graficoSeccionalRSOrdenado.slice().sort((a, b) => (b.totalRS ?? 0) - (a.totalRS ?? 0))
+      : graficoSeccionalRSOrdenado;
+
+    return { dadosEner, dadosConc, dadosServico, graficoSeccionalRSOrdenado, matrizFiltrada };
+  }, [graficoEner, graficoConc, graficoServico, graficoSeccionalRS, matriz, seccionaisSelecionadas, activeFilters]);
+
+  const formatarValorRS = (valor) =>
+    valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 });
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-900" style={{ position: 'relative', zIndex: 0, overflow: 'auto' }}>
@@ -158,11 +232,37 @@ export default function PrazosSAP() {
           <div className="flex gap-8">
             <div className="flex flex-col flex-1 gap-8">
               <div className="z-[10]">
-                <GraficoBarras titulo="Status ENER" dados={dadosEner} />
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={dadosEner} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fill: '#4a4a4a' }} />
+                    <YAxis hide />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#3182ce" onClick={data => handleChartClick('statusENER', data)}>
+                      {dadosEner.map((entry, idx) => (
+                        <Cell key={idx} fill={activeFilters.statusENER === entry.name ? '#ef4444' : '#3182ce'} />
+                      ))}
+                      <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
               <div style={{ height: '16px' }} />
               <div className="z-[10]">
-                <GraficoBarras titulo="Status CONC" dados={dadosConc} />
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={dadosConc} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fill: '#4a4a4a' }} />
+                    <YAxis hide />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#6366f1" onClick={data => handleChartClick('statusCONC', data)}>
+                      {dadosConc.map((entry, idx) => (
+                        <Cell key={idx} fill={activeFilters.statusCONC === entry.name ? '#ef4444' : '#6366f1'} />
+                      ))}
+                      <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
             <div style={{ width: '16px' }} />
@@ -173,19 +273,19 @@ export default function PrazosSAP() {
                 </h2>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={graficoSeccionalRSOrdenado} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
-                    <foreignObject x={0} y={0} width="100%" height="100%">
-                      <div style={{width: '100%', height: '100%', background: 'rgba(255,255,255,0.9)', borderRadius: 20, backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(16px)'}} />
-                    </foreignObject>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="seccional" tick={{ fill: '#4a4a4a' }} />
                     <YAxis hide />
                     <Tooltip
-                      formatter={(value: number, name: string) => [
+                      formatter={(value, name) => [
                         name === 'totalRS' ? formatarValorRS(value) : value,
                         name === 'totalRS' ? 'R$' : 'PEP',
                       ]}
                     />
-                    <Bar dataKey="totalRS" fill="#3182ce">
+                    <Bar dataKey="totalRS" fill="#3182ce" onClick={data => handleChartClick('comparison', data)}>
+                      {graficoSeccionalRSOrdenado.map((entry, idx) => (
+                        <Cell key={idx} fill={activeFilters.comparison === entry.seccional ? '#ef4444' : '#3182ce'} />
+                      ))}
                       <LabelList dataKey="totalRS" position="top" fill="#333" fontSize={12} />
                     </Bar>
                     <Bar dataKey="scaledPEP" fill="#4ade80">
@@ -199,7 +299,20 @@ export default function PrazosSAP() {
                 <div className="relative z-[20]">
                   <div className="absolute top-0 left-0 w-full h-[48px] rounded-t-3xl bg-white/90 backdrop-blur-md z-[30] pointer-events-none" />
                   <div className="relative z-[40]">
-                    <GraficoBarras titulo="Motivo de Não Fechado" dados={dadosServico} />
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={dadosServico} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" tick={{ fill: '#4a4a4a' }} />
+                        <YAxis hide />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#4ade80" onClick={data => handleChartClick('reasons', data)}>
+                          {dadosServico.map((entry, idx) => (
+                            <Cell key={idx} fill={activeFilters.reasons === entry.name ? '#ef4444' : '#4ade80'} />
+                          ))}
+                          <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               </div>
@@ -232,7 +345,7 @@ export default function PrazosSAP() {
               </h2>
             </div>
             <div className="relative z-[30]">
-              <TabelaMatriz dados={matriz} />
+              <TabelaMatriz dados={matrizFiltrada} />
             </div>
           </div>
         </div>

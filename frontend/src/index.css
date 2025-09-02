@@ -2,56 +2,120 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Garante que o root ocupa toda a tela e evita rolagem indesejada */
-html, body, #root {
-  margin: 0;
-  padding: 0;
-  width: 100vw;
-  height: 100vh;
-  font-family: system-ui, sans-serif;
-  overflow-y: auto;     /* permite rolagem vertical */
-  overflow-x: hidden;   /* mantém o bloqueio horizontal */
-  background: white;    /* fundo branco igual ao front */
+/* Tokens e gradientes principais */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 142 76% 36%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 142 35% 90%;
+    --secondary-foreground: 142 76% 15%;
+
+    --muted: 142 20% 95%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 142 35% 90%;
+    --accent-foreground: 142 76% 15%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+
+    --warning: 43 96% 56%;
+    --warning-foreground: 0 0% 0%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142 76% 36%;
+
+    /* Gradientes principais usados no projeto */
+    --gradient-primary: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(142 85% 42%) 50%, hsl(142 90% 45%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(142 35% 90%) 0%, hsl(142 45% 92%) 50%, hsl(142 20% 95%) 100%);
+    --gradient-page: linear-gradient(135deg, hsl(142 20% 98%) 0%, hsl(142 35% 96%) 25%, hsl(142 15% 97%) 50%, hsl(0 0% 98%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(142 90% 45% / 0.85) 0%, hsl(142 85% 42% / 0.78) 50%, hsl(142 76% 36% / 0.75) 100%);
+    --gradient-button: linear-gradient(135deg, hsl(142 35% 90%) 0%, hsl(142 45% 88%) 100%);
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+
+  /* Define a cor da borda via CSS var para evitar dependência de utilitário Tailwind custom */
+  * { border-color: hsl(var(--border)); }
+
+  html, body, #root {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    font-family: system-ui, sans-serif;
+    overflow-y: auto;     /* permite rolagem vertical quando necessário */
+    overflow-x: hidden;   /* impede rolagem horizontal */
+    background: hsl(var(--background));
+  }
+
+  /* Cores base do body usando variáveis CSS (sem @apply) */
+  body { background-color: hsl(var(--background)); color: hsl(var(--foreground)); }
 }
 
-/* Remove a borda preta (outline) ao focar nos gráficos do Recharts */
+/* Remove outline dos gráficos Recharts (acessível em outros elementos) */
 .recharts-wrapper:focus,
 .recharts-wrapper *:focus {
   outline: none !important;
   box-shadow: none !important;
 }
 
-/* Torna o canvas animado (FundoAnimado) fixo em background */
+/* Canvas de fundo fixo (FundoAnimado) */
 canvas {
   position: fixed;
   top: 0;
   left: 0;
   z-index: 0;
-  pointer-events: none; /* impede clique no canvas */
+  pointer-events: none;
 }
 
-/* Estilos para o botão Home com logo */
-.botao-home {
-  height: 48px;
-  background: white;
-  color: #16a34a;
-  padding: 0 1.25rem;
-  border-radius: 9999px;
-  font-weight: 600;
-  box-shadow: 0 4px 6px rgb(0 0 0 / 0.1);
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* utilitário caso falte */
+.rounded-xl { border-radius: 0.75rem; }
 
-.botao-home:hover {
-  background-color: #bbf7d0; /* Verde claro no hover */
+/* Animação do contorno: registra e anima a custom property --gangle para rotacionar o conic-gradient */
+@property --gangle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
 }
-
-.logo-botao {
-  max-width: 120px;
-  height: auto;
-  display: block;
+:root { --gangle: 0deg; }
+@keyframes gradient-rotate {
+  0% { --gangle: 0deg; }
+  100% { --gangle: 360deg; }
 }

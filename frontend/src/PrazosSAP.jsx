@@ -1,159 +1,223 @@
-import { useEffect, useState } from 'react'
-import axios from 'axios'
+// Gráfico de teste isolado para depuração de eventos
+const testData = [
+  { name: 'A', value: 12 },
+  { name: 'B', value: 8 },
+  { name: 'C', value: 15 },
+];
+
+function TestBarChart() {
+  const [selected, setSelected] = useState(null);
+  return (
+    <div style={{ background: '#fff', padding: 16, marginBottom: 32, border: '2px solid red' }}>
+      <h3>Gráfico de Teste (clique nas barras)</h3>
+      <BarChart width={400} height={200} data={testData} style={{ userSelect: 'none' }}>
+        <XAxis dataKey="name" />
+        <YAxis />
+        <Tooltip />
+        <Bar dataKey="value">
+          {testData.map((entry, idx) => (
+            <Cell
+              key={entry.name}
+              fill={selected === idx ? 'red' : '#8884d8'}
+              onClick={() => {
+                alert('Barra clicada: ' + entry.name);
+                setSelected(idx);
+              }}
+              style={{ cursor: 'pointer' }}
+            />
+          ))}
+        </Bar>
+      </BarChart>
+    </div>
+  );
+}
+import { useEffect, useState, useMemo } from 'react';
+import axios from 'axios';
 import {
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
   CartesianGrid,
-  LabelList
-} from 'recharts'
-import { useNavigate } from 'react-router-dom'
-import logo from '../assets/logo.png'
+  LabelList,
+  Cell
+} from 'recharts';
+import { ChartContainer } from './components/ChartContainer';
+import { useNavigate } from 'react-router-dom';
+import logo from '../assets/logo.png';
+
 
 function PrazosSAP() {
-  const navigate = useNavigate()
-  const [seccionais, setSeccionais] = useState([])
-  const [statusSapList, setStatusSapList] = useState([])
-  const [tiposList, setTiposList] = useState([])
-  const [mesesConclusaoList, setMesesConclusaoList] = useState([])
+  const navigate = useNavigate();
+  const [seccionais, setSeccionais] = useState([]);
+  const [statusSapList, setStatusSapList] = useState([]);
+  const [tiposList, setTiposList] = useState([]);
+  const [mesesConclusaoList, setMesesConclusaoList] = useState([]);
 
-  const [statusSapSelecionado, setStatusSapSelecionado] = useState(() => localStorage.getItem('statusSapSelecionado') || '')
-  const [tipoSelecionado, setTipoSelecionado] = useState(() => localStorage.getItem('tipoSelecionado') || '')
-  const [mesSelecionado, setMesSelecionado] = useState(() => localStorage.getItem('mesSelecionado') || '')
+  // Dados brutos dos gráficos
+  const [graficoDataEner, setGraficoDataEner] = useState([]);
+  const [graficoDataConc, setGraficoDataConc] = useState([]);
+  const [graficoDataServico, setGraficoDataServico] = useState([]);
+  const [graficoDataSeccionalRS, setGraficoDataSeccionalRS] = useState([]);
+  const [matrizDados, setMatrizDados] = useState([]);
+
+
+  // Filtros centralizados para filtro cruzado (modelo do lovable)
+  const [activeFilters, setActiveFilters] = useState({
+    statusEner: '',
+    statusConc: '',
+    motivo: '',
+    seccional: '',
+  });
+
+  // Função para clique cruzado nos gráficos (modelo do lovable)
+  const handleChartClick = (type, value) => {
+    setActiveFilters(prev => {
+      if (prev[type] === value) {
+        return { ...prev, [type]: '' };
+      }
+      return { ...prev, [type]: value };
+    });
+  };
+
+  // Filtros dropdowns (mantém visual)
+  const [statusSapSelecionado, setStatusSapSelecionado] = useState(() => localStorage.getItem('statusSapSelecionado') || '');
+  const [tipoSelecionado, setTipoSelecionado] = useState(() => localStorage.getItem('tipoSelecionado') || '');
+  const [mesSelecionado, setMesSelecionado] = useState(() => localStorage.getItem('mesSelecionado') || '');
   const [seccionaisSelecionadas, setSeccionaisSelecionadas] = useState(() => {
-    const saved = localStorage.getItem('seccionaisSelecionadas')
-    return saved ? JSON.parse(saved) : []
-  })
-
-  const [graficoDataEner, setGraficoDataEner] = useState([])
-  const [graficoDataConc, setGraficoDataConc] = useState([])
-  const [graficoDataServico, setGraficoDataServico] = useState([])
-  const [graficoDataSeccionalRS, setGraficoDataSeccionalRS] = useState([])
-  const [matrizDados, setMatrizDados] = useState([])
+    const saved = localStorage.getItem('seccionaisSelecionadas');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // Busca dados iniciais e listas para filtros
-  const API_BASE = import.meta.env.VITE_API_URL;
+  // TESTE: Força dados de exemplo para isolar problema de evento/renderização
   useEffect(() => {
-    axios.get(`${API_BASE}/seccionais/`)
-      .then(resp => setSeccionais(resp.data))
-      .catch(() => {})
-
-    axios.get(`${API_BASE}/status-sap-unicos/`)
-      .then(resp => setStatusSapList(resp.data))
-      .catch(() => {})
-
-    axios.get(`${API_BASE}/tipos-unicos/`)
-      .then(resp => setTiposList(resp.data))
-      .catch(() => {})
-
-    axios.get(`${API_BASE}/meses-conclusao/`)
-      .then(resp => setMesesConclusaoList(resp.data))
-      .catch(() => {})
-
-    axios.get(`${API_BASE}/status-ener-pep/`)
-      .then(resp => {
-        const todos = Object.entries(resp.data).flatMap(([status, obj]) =>
-          Object.entries(obj).map(([seccional, count]) => ({
-            status,
-            seccional,
-            count: Number(count) || 0
-          }))
-        )
-        setGraficoDataEner(todos)
-      })
-      .catch(() => {})
-
-    axios.get(`${API_BASE}/status-conc-pep/`)
-      .then(resp => {
-        const todos = Object.entries(resp.data).flatMap(([status, obj]) =>
-          Object.entries(obj).map(([seccional, count]) => ({
-            status,
-            seccional,
-            count: Number(count) || 0
-          }))
-        )
-        setGraficoDataConc(todos)
-      })
-      .catch(() => {})
-
-    axios.get(`${API_BASE}/status-servico-contagem/`)
-      .then(resp => {
-        const servico = Object.entries(resp.data)
-          .filter(([status]) => status.trim() !== "" && status.toLowerCase() !== "vazio")
-          .map(([status, count]) => ({
-            status,
-            count: Number(count) || 0
-          }))
-        setGraficoDataServico(servico)
-      })
-      .catch(() => {})
-
-    axios.get(`${API_BASE}/seccional-rs-pep/`)
-      .then(resp => {
-        const dadosFiltrados = Object.entries(resp.data)
-          .filter(([seccional]) => seccional !== '#N/A')
-          .map(([seccional, valores]) => ({
-            seccional,
-            totalRS: Number(valores.valor.toFixed(0)),
-            totalPEP: valores.pep_count,
-            scaledPEP: valores.pep_count * 100000
-          }))
-        setGraficoDataSeccionalRS(dadosFiltrados)
-      })
-      .catch(() => {})
-  }, [])
+    setGraficoDataEner([
+      { status: 'Fora do Prazo', count: 5 },
+      { status: 'LIB /ENER', count: 10 },
+      { status: 'Dentro do Prazo', count: 2 }
+    ]);
+    setGraficoDataConc([
+      { status: 'Conc 1', count: 3 },
+      { status: 'Conc 2', count: 7 }
+    ]);
+    setGraficoDataServico([
+      { status: 'Motivo 1', count: 4 },
+      { status: 'Motivo 2', count: 6 }
+    ]);
+    setGraficoDataSeccionalRS([
+      { seccional: 'Sul', totalRS: 100, totalPEP: 2, scaledPEP: 200000 },
+      { seccional: 'Litoral Sul', totalRS: 80, totalPEP: 1, scaledPEP: 100000 }
+    ]);
+    setMatrizDados([
+      { pep: 'PEP1', prazo: '2025-01-01', dataConclusao: '2025-02-01', statusSap: 'Fora do Prazo', valor: 1000, seccional: 'Sul' },
+      { pep: 'PEP2', prazo: '2025-03-01', dataConclusao: '2025-04-01', statusSap: 'LIB /ENER', valor: 2000, seccional: 'Litoral Sul' }
+    ]);
+    setSeccionais(['Sul', 'Litoral Sul']);
+    setStatusSapList(['Fora do Prazo', 'LIB /ENER', 'Dentro do Prazo']);
+    setTiposList(['Tipo 1', 'Tipo 2']);
+    setMesesConclusaoList(['2025-01', '2025-02']);
+  }, []);
 
   // Atualiza matriz com filtros aplicados
   useEffect(() => {
-    // Salva filtros no localStorage para persistência
-    localStorage.setItem('statusSapSelecionado', statusSapSelecionado)
-    localStorage.setItem('tipoSelecionado', tipoSelecionado)
-    localStorage.setItem('mesSelecionado', mesSelecionado)
-    localStorage.setItem('seccionaisSelecionadas', JSON.stringify(seccionaisSelecionadas))
+    localStorage.setItem('statusSapSelecionado', statusSapSelecionado);
+    localStorage.setItem('tipoSelecionado', tipoSelecionado);
+    localStorage.setItem('mesSelecionado', mesSelecionado);
+    localStorage.setItem('seccionaisSelecionadas', JSON.stringify(seccionaisSelecionadas));
 
-    const params = new URLSearchParams()
-    if (seccionaisSelecionadas.length > 0) params.append('seccional', seccionaisSelecionadas.join(','))
-    if (statusSapSelecionado) params.append('status_sap', statusSapSelecionado)
-    if (tipoSelecionado) params.append('tipo', tipoSelecionado)
-    if (mesSelecionado) params.append('mes', mesSelecionado)
+    const params = new URLSearchParams();
+    if (seccionaisSelecionadas.length > 0) params.append('seccional', seccionaisSelecionadas.join(','));
+    if (statusSapSelecionado) params.append('status_sap', statusSapSelecionado);
+    if (tipoSelecionado) params.append('tipo', tipoSelecionado);
+    if (mesSelecionado) params.append('mes', mesSelecionado);
 
     axios.get(`${API_BASE}/matriz-dados/?${params.toString()}`)
       .then(resp => setMatrizDados(resp.data))
-      .catch(() => {})
-  }, [seccionaisSelecionadas, statusSapSelecionado, tipoSelecionado, mesSelecionado])
+      .catch(() => {});
+  }, [seccionaisSelecionadas, statusSapSelecionado, tipoSelecionado, mesSelecionado]);
 
-  const toggleSeccional = (seccional) => {
-    setSeccionaisSelecionadas(prev =>
-      prev.includes(seccional)
-        ? prev.filter(s => s !== seccional)
-        : [...prev, seccional]
-    )
-  }
+  // Função de clique cruzado nos gráficos
+  const handleChartClick = (type, value) => {
+    console.log('CLIQUE NA BARRA', { type, value }); // TESTE
+    setActiveFilters(prev => {
+      // Toggle: se já está filtrado, remove
+      if (prev[type] === value) {
+        return { ...prev, [type]: '' };
+      }
+      // Só permite um filtro por tipo
+      return { ...prev, [type]: value };
+    });
+  };
 
-  const processarDados = (dados, ignorarFechada = false) => {
-    return Object.entries(
-      dados.filter(item => {
-        const seccionalMatch = seccionaisSelecionadas.length === 0 || seccionaisSelecionadas.includes(item.seccional)
-        const statusValido = ignorarFechada ? !["fechada", "fechado"].includes(item.status.toLowerCase()) : true
-        return seccionalMatch && statusValido
-      }).reduce((acc, curr) => {
-        acc[curr.status] = (acc[curr.status] || 0) + curr.count
-        return acc
-      }, {}))
-      .map(([status, count]) => ({ status, count }))
-  }
 
-  const dadosGraficoEner = processarDados(graficoDataEner)
-  const dadosGraficoConc = processarDados(graficoDataConc, true)
+  // Filtro cruzado real: ao clicar em qualquer barra, filtra todos os gráficos e a matriz (modelo do lovable)
+  const dadosFiltrados = useMemo(() => {
+    const { statusEner, statusConc, motivo, seccional } = activeFilters;
 
-  const formatarValorRS = (valor) =>
-    valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })
+    // Filtrar matriz
+    let matriz = matrizDados;
+    if (statusEner) matriz = matriz.filter(item => item.statusSap === statusEner);
+    if (statusConc) matriz = matriz.filter(item => item.statusSap === statusConc);
+    if (motivo) matriz = matriz.filter(item => item.statusSap === motivo || item.status === motivo);
+    if (seccional) matriz = matriz.filter(item => item.seccional === seccional);
+
+    // ENER
+    let ener = graficoDataEner;
+    if (seccional) ener = ener.filter(item => item.seccional === seccional);
+    if (statusConc) ener = ener.filter(item => item.status === statusConc);
+    if (motivo) ener = ener.filter(item => item.status === motivo);
+    if (statusEner) ener = ener.filter(item => item.status === statusEner);
+    ener = Object.entries(ener.reduce((acc, curr) => {
+      acc[curr.status] = (acc[curr.status] || 0) + curr.count;
+      return acc;
+    }, {})).map(([status, count]) => ({ status, count }));
+
+    // CONC
+    let conc = graficoDataConc;
+    if (seccional) conc = conc.filter(item => item.seccional === seccional);
+    if (statusEner) conc = conc.filter(item => item.status === statusEner);
+    if (motivo) conc = conc.filter(item => item.status === motivo);
+    if (statusConc) conc = conc.filter(item => item.status === statusConc);
+    conc = Object.entries(conc.reduce((acc, curr) => {
+      acc[curr.status] = (acc[curr.status] || 0) + curr.count;
+      return acc;
+    }, {})).map(([status, count]) => ({ status, count }));
+
+    // Motivo
+    let servico = graficoDataServico;
+    if (statusEner) servico = servico.filter(item => item.status === statusEner);
+    if (statusConc) servico = servico.filter(item => item.status === statusConc);
+    if (motivo) servico = servico.filter(item => item.status === motivo);
+    servico = servico.map(item => ({ ...item }));
+
+    // Seccional RS
+    let seccionalRS = graficoDataSeccionalRS;
+    if (seccional) seccionalRS = seccionalRS.filter(item => item.seccional === seccional);
+
+    return {
+      matriz,
+      ener,
+      conc,
+      servico,
+      seccionalRS
+    };
+  }, [activeFilters, matrizDados, graficoDataEner, graficoDataConc, graficoDataServico, graficoDataSeccionalRS]);
+
+  // Para manter compatibilidade visual
+  const dadosGraficoEner = dadosFiltrados.ener;
+  const dadosGraficoConc = dadosFiltrados.conc;
+  const dadosGraficoServico = dadosFiltrados.servico;
+  const dadosGraficoSeccionalRS = dadosFiltrados.seccionalRS;
+  const matrizFiltrada = dadosFiltrados.matriz;
+
+  // Formatação
+  const formatarValorRS = (valor) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 });
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-gray-100 to-gray-200">
+      <TestBarChart />
       <header
          className="w-full sticky top-0 z-[9999] flex items-center justify-between px-6 shadow-md"
          style={{ backgroundColor: '#4ade80', height: '72px' }}
@@ -170,7 +234,7 @@ function PrazosSAP() {
               </button>
 
 
-        <h1 className="text-white text-2xl font-bold font-serif text-center flex-grow">
+        <h1 className="flex-grow font-serif text-2xl font-bold text-center text-white">
           Controle de Produção - Prazos SAP
         </h1>
         <div style={{ width: 120 }} />
@@ -240,7 +304,7 @@ function PrazosSAP() {
                   <div
                     key={idx}
                     ref={cardRef}
-                    className="bg-white rounded-3xl shadow-lg flex flex-col relative h-full w-full"
+                    className="relative flex flex-col w-full h-full bg-white shadow-lg rounded-3xl"
                     style={idx === 0 ? {
                       border: '4px solid #60a5fa',
                       borderRadius: '1.5rem',
@@ -288,18 +352,28 @@ function PrazosSAP() {
                     <h2 className="text-center font-semibold font-serif text-gray-700 text-[20px] mt-2 mb-4" style={{margin: 0}}>
                       {idx === 0 ? 'Status ENER' : 'Status CONC'}
                     </h2>
-                    <div className="flex-1 p-6 flex flex-col">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={data} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
+                    <div className="flex flex-col flex-1 p-6">
+                      <div style={{ width: '100%', height: '100%' }}>
+                        <BarChart data={dadosFiltrados.ener} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="status" tick={{ fill: '#4a4a4a' }} />
                           <YAxis hide />
                           <Tooltip />
-                          <Bar dataKey="count" fill="#4ade80">
+                          <Bar dataKey="count" fill="#4ade80"
+                            onClick={data => handleChartClick('statusEner', data.status)}
+                            style={{ cursor: 'pointer' }}>
+                            {dadosFiltrados.ener.map((entry, idx) => (
+                              <Cell
+                                key={`cell-ener-${idx}`}
+                                fill={activeFilters.statusEner === entry.status ? 'red' : '#4ade80'}
+                                stroke={activeFilters.statusEner === entry.status ? 'darkred' : 'none'}
+                                strokeWidth={activeFilters.statusEner === entry.status ? 2 : 0}
+                              />
+                            ))}
                             <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
                           </Bar>
                         </BarChart>
-                      </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
                 );
@@ -311,7 +385,7 @@ function PrazosSAP() {
                 <h2 className="text-center font-semibold mb-4 font-serif text-gray-700 text-[20px]">
                   Comparativo por Seccional: R$ e Qtd PEP
                 </h2>
-                <ResponsiveContainer width="100%" height="100%">
+                <ChartContainer config={{ totalRS: { label: 'R$', color: '#3182ce' }, scaledPEP: { label: 'PEP', color: '#4ade80' } }} style={{ width: '100%', height: '100%' }}>
                   <BarChart data={graficoDataSeccionalRS} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="seccional" tick={{ fill: '#4a4a4a' }} />
@@ -322,63 +396,93 @@ function PrazosSAP() {
                         name === 'totalRS' ? 'R$' : 'PEP',
                       ]}
                     />
-                    <Bar dataKey="totalRS" fill="#3182ce">
-                      <LabelList dataKey="totalRS" position="top" fill="#333" fontSize={12} />
-                    </Bar>
-                    <Bar dataKey="scaledPEP" fill="#4ade80">
-                      <LabelList dataKey="totalPEP" position="top" fill="#333" fontSize={12} />
-                    </Bar>
+          <Bar dataKey="totalRS" fill="#3182ce"
+            onClick={data => handleChartClick('seccional', data.seccional)}
+            style={{ cursor: 'pointer' }}>
+            {dadosGraficoSeccionalRS.map((entry, idx) => (
+              <Cell
+                key={`cell-seccional-rs-${idx}`}
+                fill={activeFilters.seccional === entry.seccional ? 'red' : '#3182ce'}
+                stroke={activeFilters.seccional === entry.seccional ? 'darkred' : 'none'}
+                strokeWidth={activeFilters.seccional === entry.seccional ? 2 : 0}
+              />
+            ))}
+            <LabelList dataKey="totalRS" position="top" fill="#333" fontSize={12} />
+          </Bar>
+          <Bar dataKey="scaledPEP" fill="#4ade80"
+            onClick={data => handleChartClick('seccional', data.seccional)}
+            style={{ cursor: 'pointer' }}>
+            {dadosGraficoSeccionalRS.map((entry, idx) => (
+              <Cell
+                key={`cell-seccional-pep-${idx}`}
+                fill={activeFilters.seccional === entry.seccional ? 'red' : '#4ade80'}
+                stroke={activeFilters.seccional === entry.seccional ? 'darkred' : 'none'}
+                strokeWidth={activeFilters.seccional === entry.seccional ? 2 : 0}
+              />
+            ))}
+            <LabelList dataKey="totalPEP" position="top" fill="#333" fontSize={12} />
+          </Bar>
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </div>
 
               <div className="bg-white p-6 rounded-3xl shadow-lg h-[280px] flex flex-col">
                 <h2 className="text-center font-semibold mb-4 font-serif text-gray-700 text-[20px]">
                   Motivo de Não Fechado
                 </h2>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={graficoDataServico} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
+                <ChartContainer config={{ count: { label: 'Quantidade', color: '#4ade80' } }} style={{ width: '100%', height: '100%' }}>
+                  <BarChart data={dadosGraficoServico} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="status" tick={{ fill: '#4a4a4a' }} />
                     <YAxis hide />
                     <Tooltip />
-                    <Bar dataKey="count" fill="#4ade80">
-                      <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
-                    </Bar>
+          <Bar dataKey="count" fill="#4ade80"
+            onClick={data => handleChartClick('motivo', data.status)}
+            style={{ cursor: 'pointer' }}>
+            {dadosGraficoServico.map((entry, idx) => (
+              <Cell
+                key={`cell-motivo-${idx}`}
+                fill={activeFilters.motivo === entry.status ? 'red' : '#4ade80'}
+                stroke={activeFilters.motivo === entry.status ? 'darkred' : 'none'}
+                strokeWidth={activeFilters.motivo === entry.status ? 2 : 0}
+              />
+            ))}
+            <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
+          </Bar>
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </div>
             </div>
           </div>
 
-          <div className="mt-10 bg-white rounded-3xl shadow-lg p-6 w-full overflow-auto">
+          <div className="w-full p-6 mt-10 overflow-auto bg-white shadow-lg rounded-3xl">
             <h2 className="text-center font-semibold mb-6 font-serif text-gray-700 text-[20px]">
               Matriz de Dados
             </h2>
-            <table className="min-w-full table-auto text-sm text-left text-gray-700 border-collapse">
-              <thead className="bg-gray-100 text-xs uppercase text-gray-600">
+            <table className="min-w-full text-sm text-left text-gray-700 border-collapse table-auto">
+              <thead className="text-xs text-gray-600 uppercase bg-gray-100">
                 <tr>
-                  <th className="py-3 px-4 border border-gray-300">PEP</th>
-                  <th className="py-3 px-4 border border-gray-300">Prazo</th>
-                  <th className="py-3 px-4 border border-gray-300">Data Conclusão</th>
-                  <th className="py-3 px-4 border border-gray-300">Status SAP</th>
-                  <th className="py-3 px-4 border border-gray-300">R$</th>
+                  <th className="px-4 py-3 border border-gray-300">PEP</th>
+                  <th className="px-4 py-3 border border-gray-300">Prazo</th>
+                  <th className="px-4 py-3 border border-gray-300">Data Conclusão</th>
+                  <th className="px-4 py-3 border border-gray-300">Status SAP</th>
+                  <th className="px-4 py-3 border border-gray-300">R$</th>
                 </tr>
               </thead>
               <tbody>
-                {matrizDados.length > 0 ? (
-                  matrizDados.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-green-50 border border-gray-300">
-                      <td className="py-2 px-4">{item.pep}</td>
-                      <td className="py-2 px-4">{item.prazo}</td>
-                      <td className="py-2 px-4">{item.dataConclusao}</td>
-                      <td className="py-2 px-4">{item.statusSap}</td>
-                      <td className="py-2 px-4">{item.valor}</td>
+                {matrizFiltrada.length > 0 ? (
+                  matrizFiltrada.map((item, idx) => (
+                    <tr key={idx} className="border border-gray-300 hover:bg-green-50">
+                      <td className="px-4 py-2">{item.pep}</td>
+                      <td className="px-4 py-2">{item.prazo}</td>
+                      <td className="px-4 py-2">{item.dataConclusao}</td>
+                      <td className="px-4 py-2">{item.statusSap}</td>
+                      <td className="px-4 py-2">{item.valor}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="text-center text-gray-400 py-4">
+                    <td colSpan={5} className="py-4 text-center text-gray-400">
                       Nenhum dado disponível
                     </td>
                   </tr>
