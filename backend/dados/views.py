@@ -1,14 +1,28 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from .google_sheets import get_sheet, get_gspread_client
+
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def colunas_planilha(request):
+    """
+    Retorna os títulos das colunas (cabecalhos) de uma aba da planilha.
+    Aceita query param `aba` com o nome da aba; padrão: 'Prazos SAP'.
+    """
     try:
-        dados = carregar_planilha_como_dataframe('Prazos SAP')
+        aba = (request.GET.get('aba') or 'Prazos SAP').strip()
+        if not aba:
+            return Response({'error': 'Parâmetro "aba" inválido.'}, status=400)
+        # Usamos a função de carregamento já existente para garantir compatibilidade
+        dados = carregar_planilha_como_dataframe(aba)
         if not dados:
-            return Response({'error': 'Nenhum dado encontrado na planilha.'}, status=404)
+            return Response({'error': f'Nenhum dado encontrado na aba "{aba}".'}, status=404)
         primeira_linha = dados[0]
-        return Response({'colunas': list(primeira_linha.keys())})
+        # Retornar as chaves na ordem encontrada
+        return Response({'aba': aba, 'colunas': list(primeira_linha.keys())})
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return Response({'error': str(e)}, status=500)
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -48,6 +62,7 @@ def exemplo(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def geral(request):
     """
     Retorna dados gerais da planilha 'GERAL'.
@@ -60,6 +75,7 @@ def geral(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def programacao(request):
     """
     Retorna dados da aba 'programação' da planilha.
@@ -72,6 +88,7 @@ def programacao(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def carteira(request):
     """
     Retorna dados da aba 'Prazos SAP' da planilha.
@@ -84,6 +101,7 @@ def carteira(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def meta(request):
     try:
         data = get_sheet_cached('meta')
@@ -93,6 +111,7 @@ def meta(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def seccionais(request):
     try:
         print('--- [LOG] INICIO /api/seccionais/ ---')
@@ -123,6 +142,7 @@ def seccionais(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def status_sap_unicos(request):
     try:
         print('--- [LOG] INICIO /api/status_sap_unicos/ ---')
@@ -153,6 +173,7 @@ def status_sap_unicos(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def defeitos(request):
     try:
         gc = get_gspread_client()
@@ -178,7 +199,7 @@ def defeitos(request):
 
 
 @api_view(['GET'])
-@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def carteira_por_seccional(request):
     try:
         seccional_param = request.GET.get('seccional', '').strip()
@@ -197,7 +218,7 @@ def carteira_por_seccional(request):
 
 
 @api_view(['GET'])
-@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def status_ener_pep(request):
     try:
         data = get_sheet_cached('Prazos SAP')
@@ -221,7 +242,7 @@ def status_ener_pep(request):
 
 
 @api_view(['GET'])
-@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def status_conc_pep(request):
     try:
         data = get_sheet_cached('Prazos SAP')
@@ -245,7 +266,7 @@ def status_conc_pep(request):
 
 
 @api_view(['GET'])
-@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def status_servico_contagem(request):
     try:
         seccional_filtro = request.GET.get('seccional', '').strip()
@@ -292,7 +313,7 @@ def status_servico_contagem(request):
 
 
 @api_view(['GET'])
-@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def seccional_rs_pep(request):
     try:
         data = get_sheet_cached('Prazos SAP')
@@ -342,7 +363,7 @@ def seccional_rs_pep(request):
 
 
 @api_view(['GET'])
-@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def matriz_dados(request):
     try:
         seccional_filtro = request.GET.get('seccional', '').strip()
@@ -420,7 +441,7 @@ def matriz_dados(request):
 
 
 @api_view(['GET'])
-@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def tipos_unicos(request):
     try:
         data = get_sheet_cached('Prazos SAP')
@@ -437,7 +458,7 @@ def tipos_unicos(request):
 
 
 @api_view(['GET'])
-@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def meses_conclusao(request):
     try:
         data = get_sheet_cached('Prazos SAP')
