@@ -29,3 +29,5 @@ Thumbs.db
 *.log
 backend/*.log
 node_modules
+backend/NUL
+backend/nul
