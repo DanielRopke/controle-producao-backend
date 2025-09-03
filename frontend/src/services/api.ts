@@ -27,6 +27,14 @@ export interface DashboardAggregated {
   matrix: { pep: string; prazo: string; dataConclusao: string; status: string; rs: number }[]
 }
 export interface BaseFilters { seccional?: string; statusSap?: string; tipo?: string; mes?: string; dataInicio?: string; dataFim?: string }
+// Tipos de auth/cadastro
+export interface RegisterPayload {
+  username: string
+  email: string
+  matricula: string
+  password: string
+}
+
 // Filtros adicionais (a API atual pode não suportar — usados para lógica local de cross-filter)
 export interface ExtendedFilters extends BaseFilters { statusEner?: string; statusConc?: string; motivo?: string }
 
@@ -50,6 +58,21 @@ function buildParams(f: BaseFilters | ExtendedFilters): Record<string,string> {
   return p
 }
 
+// Interceptor: injeta Authorization se houver token no localStorage,
+// mas evita anexar em rotas de autenticação (/token e /token/refresh)
+axios.interceptors.request.use((config) => {
+  const url = (config.url || '').toString()
+  const isAuthEndpoint = /\/token\/?$|\/token\/refresh\/?$/.test(url)
+  if (!isAuthEndpoint) {
+    const token = localStorage.getItem('jwt_access')
+    if (token) {
+      config.headers = config.headers || {}
+      config.headers['Authorization'] = `Bearer ${token}`
+    }
+  }
+  return config
+})
+
 async function get<T>(path: string, params?: Record<string,string>): Promise<T> {
   const res = await axios.get<T>(`${API_BASE}${path}`, { params })
   return res.data
@@ -65,7 +88,16 @@ export const api = {
   getGraficoConc: () => get<Record<string, Record<string, number>>>('/status-conc-pep/'),
   getGraficoServico: (filters?: BaseFilters) => get<Record<string, Record<string, number>>>('/status-servico-contagem/', filters ? buildParams(filters) : undefined),
   getGraficoSeccionalRS: (filters?: BaseFilters) => get<Record<string, { valor: number; pep_count: number }>>('/seccional-rs-pep/', filters ? buildParams(filters) : undefined),
-  getMatrizDados: (filters?: BaseFilters) => get<MatrixRowApi[]>('/matriz-dados/', filters ? buildParams(filters) : undefined)
+  getMatrizDados: (filters?: BaseFilters) => get<MatrixRowApi[]>('/matriz-dados/', filters ? buildParams(filters) : undefined),
+  // Auth
+  register: async (payload: RegisterPayload) => {
+    const res = await axios.post(`${API_BASE}/auth/register`, payload)
+    return res.data as { message: string }
+  },
+  verifyEmail: async (uid: string, token: string) => {
+    const res = await axios.post(`${API_BASE}/auth/verify-email`, { uid, token })
+    return res.data as { message: string }
+  }
 }
 
 // ------------------ Agregação para Dashboard ------------------
@@ -141,6 +173,10 @@ export function getMatrizDados(params: Record<string, string> = {}) {
   return axios.get(`${API_BASE}/matriz-dados/`, { params })
 }
 
+export function getProgramacao(params: Record<string, string> = {}) {
+  return axios.get(`${API_BASE}/programacao/`, { params })
+}
+
 export function getStatusEnerPep(params: Record<string, string> = {}) {
   return axios.get(`${API_BASE}/status-ener-pep/`, { params })
 }
@@ -163,4 +199,21 @@ export function getTiposUnicos() {
 
 export function getMesesConclusao() {
   return axios.get(`${API_BASE}/meses-conclusao/`)
+}
+
+// ================== Auth ==================
+export async function login(username: string, password: string) {
+  // Evita token antigo atrapalhar fluxo de login
+  localStorage.removeItem('jwt_access')
+  localStorage.removeItem('jwt_refresh')
+  const res = await axios.post(`${API_BASE}/token/`, { username, password })
+  const { access, refresh } = res.data as { access: string; refresh: string }
+  localStorage.setItem('jwt_access', access)
+  localStorage.setItem('jwt_refresh', refresh)
+  return res.data
+}
+
+export function logout() {
+  localStorage.removeItem('jwt_access')
+  localStorage.removeItem('jwt_refresh')
 }
