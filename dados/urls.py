@@ -18,4 +18,7 @@ urlpatterns = [
     path('matriz-dados/', views.matriz_dados),
     path('tipos-unicos/', views.tipos_unicos),
     path('meses-conclusao/', views.meses_conclusao),
+    # Auth (cadastro e verificação)
+    path('auth/register', views.auth_register),
+    path('auth/verify-email', views.auth_verify_email),
 ]
