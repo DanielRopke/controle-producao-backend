@@ -34,6 +34,11 @@ export interface RegisterPayload {
   matricula: string
   password: string
 }
+export interface RegisterResponse {
+  message: string
+  verify_url?: string
+  sent?: boolean
+}
 
 // Filtros adicionais (a API atual pode não suportar — usados para lógica local de cross-filter)
 export interface ExtendedFilters extends BaseFilters { statusEner?: string; statusConc?: string; motivo?: string }
@@ -96,7 +101,7 @@ export const api = {
   // Auth
   register: async (payload: RegisterPayload) => {
     const res = await axios.post(`${API_BASE}/auth/register`, payload)
-    return res.data as { message: string }
+    return res.data as RegisterResponse
   },
   verifyEmail: async (uid: string, token: string) => {
     const res = await axios.post(`${API_BASE}/auth/verify-email`, { uid, token })

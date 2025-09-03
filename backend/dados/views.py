@@ -112,10 +112,16 @@ def auth_register(request):
             "Se não foi você, ignore esta mensagem."
         )
         try:
-            send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [existing.email], fail_silently=False)
+            sent = send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [existing.email], fail_silently=False)
         except Exception:
+            sent = 0
             print('Verification link:', verify_link)
-        return Response({'message': 'Reenviamos o e-mail de verificação.'})
+        # Resposta com link opcional de debug
+        resp = {'message': 'Reenviamos o e-mail de verificação.'}
+        if os.getenv('EXPOSE_VERIFY_LINK', 'false').lower() == 'true':
+            resp['verify_url'] = verify_link
+            resp['sent'] = bool(sent)
+        return Response(resp)
 
     # Fluxo normal de criação
     ser = RegisterSerializer(data=data)
@@ -135,12 +141,17 @@ def auth_register(request):
         "Se não foi você, ignore esta mensagem."
     )
     try:
-        send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
+        sent = send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
     except Exception:
+        sent = 0
         # Fallback: logar no console do servidor
         print('Verification link:', verify_link)
 
-    return Response({'message': 'Cadastro recebido. Verifique seu e-mail para ativar a conta.'}, status=201)
+    resp = {'message': 'Cadastro recebido. Verifique seu e-mail para ativar a conta.'}
+    if os.getenv('EXPOSE_VERIFY_LINK', 'false').lower() == 'true':
+        resp['verify_url'] = verify_link
+        resp['sent'] = bool(sent)
+    return Response(resp, status=201)
 
 
 @api_view(['POST'])

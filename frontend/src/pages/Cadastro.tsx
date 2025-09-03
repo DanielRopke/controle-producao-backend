@@ -106,13 +106,24 @@ export default function Cadastro() {
     }
     ;(async () => {
       try {
-        await api.register({
+        const res = await api.register({
           username: username.trim() || emailTrim.split('@')[0],
           email: emailTrim,
           matricula: matricula.trim(),
           password: password,
         })
-        toast.success('Cadastro recebido! Verifique seu e-mail para confirmar.')
+        if (res.verify_url) {
+          toast.success('Cadastro recebido! Você pode confirmar pelo e-mail ou clicar aqui para ativar agora.', {
+            action: {
+              label: 'Confirmar agora',
+              onClick: () => {
+                window.location.assign(res.verify_url!)
+              }
+            }
+          })
+        } else {
+          toast.success('Cadastro recebido! Verifique seu e-mail para confirmar.')
+        }
       } catch (err: unknown) {
         let msg = 'Falha ao cadastrar'
         if (typeof err === 'object' && err && 'response' in err) {
