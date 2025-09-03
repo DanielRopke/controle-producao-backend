@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from .google_sheets import get_sheet, get_gspread_client
 
 @api_view(['GET'])
@@ -48,9 +48,17 @@ def get_sheet_cached(sheet_name):
         _sheet_cache[sheet_name] = (now, data)
         return data
 from .planilha import carregar_planilha_como_dataframe
-from .serializers import MatrizItemSerializer
+from .serializers import MatrizItemSerializer, RegisterSerializer
 from dateutil.parser import parse
 import os
+from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
+from django.core.mail import send_mail
+from django.conf import settings
+
+User = get_user_model()
 
 
 @api_view(['GET'])
@@ -59,6 +67,55 @@ def exemplo(request):
     Endpoint de exemplo para testar funcionamento da API.
     """
     return Response({"mensagem": "API funcionando com sucesso!"})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def auth_register(request):
+    """Registra um novo usuário inativo e envia e-mail de verificação."""
+    ser = RegisterSerializer(data=request.data)
+    ser.is_valid(raise_exception=True)
+    user = ser.save()
+
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
+    verify_link = f"{frontend_base}/cadastro?uid={uid}&token={token}"
+
+    subject = "Verifique seu cadastro"
+    body = (
+        "Olá,\n\n"
+        "Recebemos seu cadastro. Para ativar sua conta, confirme pelo link abaixo:\n"
+        f"{verify_link}\n\n"
+        "Se não foi você, ignore esta mensagem."
+    )
+    try:
+        send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
+    except Exception:
+        # Fallback: logar no console do servidor
+        print('Verification link:', verify_link)
+
+    return Response({'message': 'Cadastro recebido. Verifique seu e-mail para ativar a conta.'}, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def auth_verify_email(request):
+    """Confirma e ativa a conta a partir de uid+token."""
+    uidb64 = request.data.get('uid')
+    token = request.data.get('token')
+    if not uidb64 or not token:
+        return Response({'detail': 'Parâmetros inválidos.'}, status=400)
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+    except Exception:
+        return Response({'detail': 'Link inválido.'}, status=400)
+    if not default_token_generator.check_token(user, token):
+        return Response({'detail': 'Token inválido ou expirado.'}, status=400)
+    user.is_active = True
+    user.save(update_fields=['is_active'])
+    return Response({'message': 'Conta verificada com sucesso.'})
 
 
 @api_view(['GET'])
