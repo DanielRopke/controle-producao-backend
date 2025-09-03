@@ -57,6 +57,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db.models import Q
 
 User = get_user_model()
 
@@ -72,8 +73,52 @@ def exemplo(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def auth_register(request):
-    """Registra um novo usuário inativo e envia e-mail de verificação."""
-    ser = RegisterSerializer(data=request.data)
+    """Registra ou reenvia verificação se usuário já existir e estiver inativo."""
+    data = request.data or {}
+    username = (data.get('username') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+    matricula = (data.get('matricula') or '').strip()
+    password = data.get('password') or ''
+
+    # Validações mínimas (mimetiza RegisterSerializer)
+    if not email or not email.endswith('@gruposetup.com'):
+        return Response({'email': 'Use o e-mail empresarial @gruposetup.com.'}, status=400)
+    if len(password) <= 8 or not any(c.islower() for c in password) or not any(c.isupper() for c in password) or password.isalnum():
+        return Response({'password': 'Senha fraca: mínimo 9 caracteres com maiúscula, minúscula e caractere especial.'}, status=400)
+    if not matricula:
+        return Response({'matricula': 'Informe a matrícula.'}, status=400)
+
+    # Se já existe usuário por e-mail ou username
+    existing = User.objects.filter(Q(email__iexact=email) | Q(username=username)).first()
+    if existing:
+        if existing.is_active:
+            return Response({'detail': 'Usuário já ativo. Faça login.'}, status=400)
+        # Atualiza dados e reenvia e-mail de verificação
+        if username and existing.username != username:
+            existing.username = username
+        existing.first_name = matricula
+        existing.set_password(password)
+        existing.save(update_fields=['username', 'first_name', 'password'])
+
+        uid = urlsafe_base64_encode(force_bytes(existing.pk))
+        token = default_token_generator.make_token(existing)
+        frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
+        verify_link = f"{frontend_base}/cadastro?uid={uid}&token={token}"
+        subject = "Verifique seu cadastro"
+        body = (
+            "Olá,\n\n"
+            "Você solicitou novamente a ativação da sua conta. Confirme pelo link abaixo:\n"
+            f"{verify_link}\n\n"
+            "Se não foi você, ignore esta mensagem."
+        )
+        try:
+            send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [existing.email], fail_silently=False)
+        except Exception:
+            print('Verification link:', verify_link)
+        return Response({'message': 'Reenviamos o e-mail de verificação.'})
+
+    # Fluxo normal de criação
+    ser = RegisterSerializer(data=data)
     ser.is_valid(raise_exception=True)
     user = ser.save()
 
