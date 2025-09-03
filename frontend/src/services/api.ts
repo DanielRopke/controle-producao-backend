@@ -62,13 +62,17 @@ function buildParams(f: BaseFilters | ExtendedFilters): Record<string,string> {
 // mas evita anexar em rotas de autenticação (/token e /token/refresh)
 axios.interceptors.request.use((config) => {
   const url = (config.url || '').toString()
-  const isAuthEndpoint = /\/token\/?$|\/token\/refresh\/?$/.test(url)
-  if (!isAuthEndpoint) {
+  // Não anexar Authorization para endpoints públicos de auth
+  const isPublicAuth = /\/token\/?$|\/token\/refresh\/?$|\/auth\/(register|verify-email)\/?$/.test(url)
+  if (!isPublicAuth) {
     const token = localStorage.getItem('jwt_access')
     if (token) {
       config.headers = config.headers || {}
       config.headers['Authorization'] = `Bearer ${token}`
     }
+  } else if (config.headers && 'Authorization' in config.headers) {
+    // Garantir que não vai nenhum header Authorization por engano
+    delete (config.headers as Record<string, unknown>)['Authorization']
   }
   return config
 })
