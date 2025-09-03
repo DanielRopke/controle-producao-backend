@@ -17,6 +17,10 @@ export default function Cadastro() {
   const [usernameTouched, setUsernameTouched] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  // cooldown de reenvio por e-mail (2 min)
+  const COOLDOWN_MS = 2 * 60 * 1000
+  const [firstSentAt, setFirstSentAt] = useState<number | null>(null)
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(0)
   const passwordPattern = '(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{9,}'
 
   const policy = useMemo(() => ({
@@ -62,15 +66,64 @@ export default function Cadastro() {
     })()
   }, [location.search, navigate])
 
+  // Carrega timestamp do primeiro envio para o e-mail atual (se existir)
+  useEffect(() => {
+    const key = email ? `register_firstSentAt:${email.trim().toLowerCase()}` : ''
+    if (!key) { setFirstSentAt(null); setRemainingSeconds(0); return }
+    const saved = localStorage.getItem(key)
+    const ts = saved ? Number(saved) : NaN
+    if (!Number.isNaN(ts)) {
+      setFirstSentAt(ts)
+      const diff = Date.now() - ts
+      const remain = Math.max(0, Math.ceil((COOLDOWN_MS - diff) / 1000))
+      setRemainingSeconds(remain)
+    } else {
+      setFirstSentAt(null)
+      setRemainingSeconds(0)
+    }
+  }, [email])
+
+  // Atualiza contador a cada 1s quando em cooldown
+  useEffect(() => {
+    if (!firstSentAt) return
+    const id = window.setInterval(() => {
+      const diff = Date.now() - firstSentAt
+      const remain = Math.max(0, Math.ceil((COOLDOWN_MS - diff) / 1000))
+      setRemainingSeconds(remain)
+      if (remain <= 0) {
+        window.clearInterval(id)
+      }
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [firstSentAt])
+
+  const emailTrim = email.trim()
+  const emailOk = useMemo(() => /@[gG][rR][uU][pP][oO][sS][eE][tT][uU][pP]\.com$/i.test(emailTrim), [emailTrim])
+  const passwordOk = useMemo(() => password.length > 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /[^A-Za-z0-9]/.test(password), [password])
+  const confirmOk = confirmPassword === password
+  const formValid = emailOk && matricula.trim().length > 0 && passwordOk && confirmOk
+
+  function saveFirstSentNow(currentEmail: string) {
+    const key = `register_firstSentAt:${currentEmail.trim().toLowerCase()}`
+    const now = Date.now()
+    localStorage.setItem(key, String(now))
+    setFirstSentAt(now)
+    setRemainingSeconds(Math.ceil(COOLDOWN_MS / 1000))
+  }
+
+  function formatMMSS(totalSeconds: number) {
+    const m = Math.floor(totalSeconds / 60)
+    const s = totalSeconds % 60
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const emailTrim = email.trim()
     if (!emailTrim) {
       toast.error('Informe o e-mail empresarial')
       return
     }
     // Validar domínio corporativo específico: deve terminar com @gruposetup.com
-    const emailOk = /@[gG][rR][uU][pP][oO][sS][eE][tT][uU][pP]\.com$/i.test(emailTrim)
     if (!emailOk) {
       toast.error('Email Inválido.')
       return
@@ -104,26 +157,27 @@ export default function Cadastro() {
       toast.error('As senhas não conferem')
       return
     }
+
+    // Bloqueia reenvio dentro de 2 minutos
+    if (firstSentAt) {
+      const elapsed = Date.now() - firstSentAt
+      if (elapsed < COOLDOWN_MS) {
+        toast.message('Confirmação de Email já Enviado')
+        return
+      }
+    }
     ;(async () => {
       try {
-        const res = await api.register({
+        const isResend = !!firstSentAt
+        await api.register({
           username: username.trim() || emailTrim.split('@')[0],
           email: emailTrim,
           matricula: matricula.trim(),
           password: password,
         })
-        if (res.verify_url) {
-          toast.success('Cadastro recebido! Você pode confirmar pelo e-mail ou clicar aqui para ativar agora.', {
-            action: {
-              label: 'Confirmar agora',
-              onClick: () => {
-                window.location.assign(res.verify_url!)
-              }
-            }
-          })
-        } else {
-          toast.success('Cadastro recebido! Verifique seu e-mail para confirmar.')
-        }
+        // Marca o horário do envio para controle do cooldown
+        saveFirstSentNow(emailTrim)
+        toast.success(isResend ? 'Email de Confirmação Reenviado.' : 'Cadastro recebido! Verifique seu e-mail para confirmar.')
       } catch (err: unknown) {
         let msg = 'Falha ao cadastrar'
         if (typeof err === 'object' && err && 'response' in err) {
@@ -140,6 +194,29 @@ export default function Cadastro() {
         toast.error(msg)
       }
     })()
+  }
+
+  const handleResend = async () => {
+    if (!formValid) {
+      toast.error('Preencha os campos corretamente antes de reenviar.')
+      return
+    }
+    if (remainingSeconds > 0) {
+      toast.message('Confirmação de Email já Enviado')
+      return
+    }
+    try {
+      await api.register({
+        username: username.trim() || emailTrim.split('@')[0],
+        email: emailTrim,
+        matricula: matricula.trim(),
+        password: password,
+      })
+      saveFirstSentNow(emailTrim)
+      toast.success('Email de Confirmação Reenviado.')
+    } catch (err) {
+      toast.error('Falha ao reenviar o e-mail de confirmação')
+    }
   }
 
   return (
@@ -277,7 +354,20 @@ export default function Cadastro() {
           </div>
           <button type="submit" className="w-full py-2 text-white rounded bg-emerald-600">Cadastrar</button>
         </form>
-  <Link to="/login" className="block text-sm text-center text-emerald-700 hover:underline">Voltar ao Login</Link>
+        <div className="mt-2 flex items-center justify-between text-sm">
+          <Link to="/login" className="text-emerald-700 hover:underline">Voltar ao Login</Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={!formValid || remainingSeconds > 0}
+              className={`px-3 py-1 rounded border ${(!formValid || remainingSeconds>0) ? 'text-gray-400 border-gray-200' : 'text-emerald-700 border-emerald-600 hover:bg-emerald-50'}`}
+            >
+              Reenviar Email
+            </button>
+            <span className="text-gray-500 tabular-nums">{remainingSeconds > 0 ? formatMMSS(remainingSeconds) : '00:00'}</span>
+          </div>
+        </div>
       </div>
     </div>
   )
