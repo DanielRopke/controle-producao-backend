@@ -31,10 +31,13 @@ export default function Login() {
         }
         msg = msg || e.message
       }
-      if (status === 401) {
-        toast.error('Credenciais inválidas');
+      // Se o backend retornou um detalhe mais específico (ex.: conta inativa), priorizar essa mensagem
+      if (msg && /inativ|verifique seu e-mail|email/i.test(msg)) {
+        toast.error(msg)
+      } else if (status === 401) {
+        toast.error('Credenciais inválidas')
       } else {
-        toast.error(msg || 'Falha ao conectar ao servidor');
+        toast.error(msg || 'Falha ao conectar ao servidor')
       }
     }
   };
