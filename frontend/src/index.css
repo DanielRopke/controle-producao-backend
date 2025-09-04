@@ -82,11 +82,12 @@
     font-family: system-ui, sans-serif;
     overflow-y: auto;     /* permite rolagem vertical quando necessário */
     overflow-x: hidden;   /* impede rolagem horizontal */
-    background: hsl(var(--background));
+    /* deixamos o background transparente para que o canvas do FundoAnimado (montado no body) apareça atrás do conteúdo */
+    background: transparent;
   }
 
   /* Cores base do body usando variáveis CSS (sem @apply) */
-  body { background-color: hsl(var(--background)); color: hsl(var(--foreground)); }
+  body { background-color: transparent; color: hsl(var(--foreground)); }
 }
 
 /* Remove outline dos gráficos Recharts (acessível em outros elementos) */
@@ -101,7 +102,7 @@ canvas {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
 }
 

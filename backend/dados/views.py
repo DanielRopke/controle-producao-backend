@@ -1,4 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
+# Nota: alteração inócua para acionar deploy no Render e testar envio de e-mail de confirmação (2)
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .google_sheets import get_sheet, get_gspread_client
 
@@ -112,15 +113,12 @@ def auth_register(request):
             "Se não foi você, ignore esta mensagem."
         )
         try:
-            sent = send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [existing.email], fail_silently=False)
+            send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [existing.email], fail_silently=False)
         except Exception:
-            sent = 0
             print('Verification link:', verify_link)
-        # Resposta com link opcional de debug
         resp = {'message': 'Reenviamos o e-mail de verificação.'}
-        if os.getenv('EXPOSE_VERIFY_LINK', 'false').lower() == 'true':
-            resp['verify_url'] = verify_link
-            resp['sent'] = bool(sent)
+        if getattr(settings, 'DEBUG', False):
+            resp['debug_verify_link'] = verify_link
         return Response(resp)
 
     # Fluxo normal de criação
@@ -141,16 +139,14 @@ def auth_register(request):
         "Se não foi você, ignore esta mensagem."
     )
     try:
-        sent = send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
+        send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
     except Exception:
-        sent = 0
         # Fallback: logar no console do servidor
         print('Verification link:', verify_link)
 
     resp = {'message': 'Cadastro recebido. Verifique seu e-mail para ativar a conta.'}
-    if os.getenv('EXPOSE_VERIFY_LINK', 'false').lower() == 'true':
-        resp['verify_url'] = verify_link
-        resp['sent'] = bool(sent)
+    if getattr(settings, 'DEBUG', False):
+        resp['debug_verify_link'] = verify_link
     return Response(resp, status=201)
 
 

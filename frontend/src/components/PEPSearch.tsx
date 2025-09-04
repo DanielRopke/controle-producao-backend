@@ -23,7 +23,7 @@ export function PEPSearch({
           type="text"
           value={searchValue}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Digite o código PEP"
+          placeholder="Digite a PEP"
           className="w-full py-2 pl-10 pr-10 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
         />
         {searchValue && (

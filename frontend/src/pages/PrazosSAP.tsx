@@ -1,5 +1,6 @@
 // Dashboard consolidado: conteúdo migrado da antiga PrazosSAP1
 import React, { useEffect, useState, useRef } from 'react';
+import ContextMenu from '../components/ContextMenu';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -35,6 +36,10 @@ type BarLabelProps = {
 	index?: number;
 };
 
+// Tipos mínimos para renderizadores e callbacks do recharts (evitar `any`)
+type ChartTickProps = { x?: number; y?: number; payload?: { value?: string } };
+type BarDatumLike = { name?: string; payload?: { name?: string } } | undefined;
+
 export default function PrazosSAP() {
 	const navigate = useNavigate();
 	const [selectedRegion, setSelectedRegion] = useState<string>('all');
@@ -45,7 +50,22 @@ export default function PrazosSAP() {
 	const [selectedStatusSap, setSelectedStatusSap] = useState<string>('');
 	const [selectedTipo, setSelectedTipo] = useState<string>('');
 	const [selectedMes, setSelectedMes] = useState<string>('');
-	const [selectedMatrixRow, setSelectedMatrixRow] = useState<string | null>(null);
+	const [selectedMatrixRows, setSelectedMatrixRows] = useState<string[]>([]);
+	const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+	// Context menu state
+	const [contextOpen, setContextOpen] = useState(false);
+	const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
+	const [contextItems, setContextItems] = useState<{ id: string; label: string; onClick: () => void }[]>([]);
+
+	// garante que os estados do menu de contexto sejam lidos pelo TS (evita TS6133)
+	useEffect(() => {
+		// leitura intencional para suprimir 'declared but never read' quando o compilador
+		// não detecta uso em JSX em alguns casos.
+		void contextOpen;
+		void contextPos;
+		void contextItems;
+	}, [contextOpen, contextPos, contextItems]);
+
 	const [sortConfig, setSortConfig] = useState<{ key?: keyof DashboardData['matrix'][0]; direction?: 'asc' | 'desc' }>({});
 	const [regions, setRegions] = useState<string[]>([]);
 	const [rawRows, setRawRows] = useState<MatrizItem[]>([]);
@@ -121,6 +141,28 @@ export default function PrazosSAP() {
 	const comparisonRef = useRef<HTMLDivElement>(null);
 	const statusCONCRef = useRef<HTMLDivElement>(null);
 	const reasonsRef = useRef<HTMLDivElement>(null);
+	// Ref para o wrapper da tabela (usado para rolamento automático)
+	const tableWrapperRef = useRef<HTMLDivElement | null>(null);
+
+	// Helper para rolar a linha visível ao navegar por teclado/seleção
+	const scrollToRow = (idx: number) => {
+		try {
+			const container = tableWrapperRef.current;
+			let el: HTMLElement | null = null;
+			if (container) {
+				el = container.querySelector(`[data-row-index="${idx}"]`);
+			}
+			if (!el) {
+				el = document.querySelector(`[data-row-index="${idx}"]`);
+			}
+			if (el) {
+				el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+			}
+		} catch (err) {
+			// falhar silenciosamente se algo der errado
+			console.debug('scrollToRow error', err);
+		}
+	};
 
 	// Renderizador de rótulos: quando a barra estiver ativa, usa preto e negrito
 	const makeLabelRenderer = (
@@ -297,6 +339,78 @@ export default function PrazosSAP() {
 		} as DashboardData;
 	}, [rawRows, selectedRegion, activeFilters, pepSearch, sortConfig, statusEnerMap, statusConcMap, reasonsMap]);
 
+	// Handler de teclado: navegação por setas e seleções estendidas
+	useEffect(() => {
+		const handler = (ev: KeyboardEvent) => {
+			// não interferir quando um input/textarea ou elemento editável estiver focado
+			const active = document.activeElement as HTMLElement | null;
+			if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+
+			const rows = (filteredData && Array.isArray(filteredData.matrix)) ? filteredData.matrix : [];
+			if (!rows.length) return;
+
+			// Ctrl/Cmd + Shift + ArrowDown => selecionar até o fim (comportamento já existente)
+			if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey && ev.key === 'ArrowDown') {
+				ev.preventDefault();
+				const start = (typeof lastSelectedIndex === 'number' && lastSelectedIndex >= 0) ? lastSelectedIndex : 0;
+				const toSelect = rows.slice(start).map(r => r.pep);
+				// preserva seleção anterior antes do start quando existir
+				setSelectedMatrixRows(prev => {
+					const prefix = Array.isArray(prev) ? prev.filter(p => {
+						const idx = rows.findIndex(r => r.pep === p);
+						return idx >= 0 && idx < start;
+					}) : [];
+					return Array.from(new Set([...prefix, ...toSelect]));
+				});
+				setLastSelectedIndex(rows.length - 1);
+				scrollToRow(rows.length - 1);
+				return;
+			}
+
+			// ArrowDown / ArrowUp navegação simples
+			if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+				ev.preventDefault();
+				// determina índice atual: preferir lastSelectedIndex, caso contrário usar primeiro selecionado
+				let current = typeof lastSelectedIndex === 'number' && lastSelectedIndex >= 0 ? lastSelectedIndex : -1;
+				if (current === -1 && Array.isArray(selectedMatrixRows) && selectedMatrixRows.length) {
+					const firstPep = selectedMatrixRows[0];
+					const idx = rows.findIndex(r => r.pep === firstPep);
+					if (idx >= 0) current = idx;
+				}
+
+				const dir = ev.key === 'ArrowDown' ? 1 : -1;
+				let next = current + dir;
+				if (next < 0) next = 0;
+				if (next > rows.length - 1) next = rows.length - 1;
+
+				if (ev.shiftKey && current >= 0) {
+					// estender seleção entre current e next, preservando seleção fora do intervalo atual
+					const start = Math.min(current, next);
+					const end = Math.max(current, next);
+					const range = rows.slice(start, end + 1).map(r => r.pep);
+					setSelectedMatrixRows(prev => {
+						const preserved = Array.isArray(prev) ? prev.filter(p => {
+							const idx = rows.findIndex(r => r.pep === p);
+							return idx === -1 || idx < start || idx > end; // mantém itens fora do novo intervalo
+						}) : [];
+						return Array.from(new Set([...preserved, ...range]));
+					});
+					setLastSelectedIndex(next);
+					scrollToRow(next);
+					return;
+				}
+
+				// sem shift: selecionar apenas a próxima linha (substitui seleção)
+				setSelectedMatrixRows([rows[next].pep]);
+				setLastSelectedIndex(next);
+				scrollToRow(next);
+				return;
+			}
+		};
+		document.addEventListener('keydown', handler);
+		return () => document.removeEventListener('keydown', handler);
+	}, [lastSelectedIndex, filteredData, selectedMatrixRows]);
+
 	// Atualiza lista de regiões conforme dados carregados (sem aplicar filtros interativos)
 	useEffect(() => {
 		const m = new Map<string, number>();
@@ -443,10 +557,10 @@ export default function PrazosSAP() {
 
 	return (
 		<div className="relative z-10 min-h-screen bg-transparent lovable">
-			{/* Fundo animado em toda a página (fixo atrás do conteúdo) */}
-			<FundoAnimado />
+			{/* Fundo animado em toda a página (fixo atrás do conteúdo) - sem badge nesta página */}
+			<FundoAnimado showBadge={false} />
 			<header className="fixed top-0 left-0 right-0 z-50 border-b border-green-500 shadow-md bg-gradient-to-r from-green-600 via-green-600/90 to-green-700">
-				<div className="relative flex items-center justify-between h-16 px-4 lg:px-6">
+				<div className="relative flex items-center justify-between h-16 px-4 pr-8 lg:px-6">
 					{/* Título centralizado */}
 					<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
 						<h1 className="font-inter text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-wide leading-none text-white drop-shadow-[0_3px_6px_rgba(0,0,0,0.35)]">
@@ -464,13 +578,13 @@ export default function PrazosSAP() {
 						</Button>
 						<div className="flex items-center gap-3">
 							<div
-								className="bg-white px-3 lg:px-4 rounded-xl font-bold shadow-md text-center w-[172px] h-10 flex items-center justify-center overflow-hidden cursor-pointer hover:shadow-lg hover:bg-gray-50"
+								className="flex items-center justify-center px-2 ml-4 overflow-hidden font-bold text-center bg-white shadow-md cursor-pointer rounded-xl hover:shadow-lg hover:bg-gray-50"
 								onClick={() => navigate('/obras')}
 								title="Ir para Obras"
 								role="button"
 								tabIndex={0}
 							>
-								<img src={LogoSetup} alt="Grupo Setup" className="object-contain w-full h-auto max-h-6" />
+								<img src={LogoSetup} alt="Grupo Setup" className="object-contain w-auto h-10 max-w-full" />
 							</div>
 							<Button
 								variant="outline"
@@ -487,7 +601,7 @@ export default function PrazosSAP() {
 						<div className="flex items-center gap-2 lg:gap-3">
 							<span className="hidden text-xs text-white lg:text-sm sm:inline">Valor Total</span>
 							<div className="px-2 py-1 text-sm font-semibold text-green-600 bg-white rounded-lg shadow-md lg:px-4 lg:py-2 lg:rounded-xl lg:text-base w-[105px] text-center whitespace-nowrap">
-								R$ {formatValorShort(totalValue)}
+								{formatValorShort(totalValue)}
 							</div>
 						</div>
 						<div className="flex items-center gap-2 lg:gap-3">
@@ -500,7 +614,7 @@ export default function PrazosSAP() {
 				</div>
 			</header>
 
-			<div className="relative flex pt-16">
+			<div className="relative flex" style={{ paddingTop: 'calc(4rem + 16px)' }}>
 				{sidebarOpen && (
 					<div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
 				)}
@@ -581,17 +695,16 @@ export default function PrazosSAP() {
 					</div>
 				</aside>
 
-				<main className="flex-1 w-full p-2 sm:p-4 lg:p-6 lg:ml-64">
+				<main className="flex-1 w-full px-2 sm:px-4 lg:px-6 pt-0 pb-2 sm:pb-4 lg:pb-6 lg:ml-64">
 					<div className="lg:h-[calc(100vh-8rem)] lg:min-h-[500px] lg:max-h-[calc(100vh-8rem)] mb-8">
 						<div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-3 lg:h-full lg:grid-rows-2">
-							<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.02] hover:bg-gradient-card-hover overflow-hidden" ref={statusENERRef} tabIndex={0}>
-								<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
+								<Card className="shadow-card hover:shadow-card-hover bg-white border-gray-200 transform transition-all duration-300 hover:scale-[1.02] overflow-hidden" ref={statusENERRef} tabIndex={0}>
+								<CardHeader className="flex flex-row items-center justify-between bg-white border-b border-gray-300 rounded-t-xl">
 									<CardTitle className="text-lg font-semibold text-secondary-foreground">Status ENER</CardTitle>
 									<Button
-										variant="outline"
 										size="sm"
 										onClick={() => copyChartImage(statusENERRef, 'Status ENER')}
-										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg focus:outline-none focus:ring-0 ring-0"
 										title="Copiar imagem (ou clique no gráfico e Ctrl+C)"
 									>
 										<Copy className="w-4 h-4" />
@@ -602,10 +715,22 @@ export default function PrazosSAP() {
 										<ResponsiveContainer width="100%" height="100%">
 											<BarChart data={filteredData.statusENER} margin={{ top: 20, right: 15, bottom: 50, left: 15 }}>
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-												<XAxis dataKey="name" fontSize={12} tickMargin={8} />
+												<XAxis dataKey="name" fontSize={12} tickMargin={8} tick={(props: unknown) => {
+													const p = props as ChartTickProps;
+													const value = p && p.payload ? p.payload.value : '';
+													return (
+														<g transform={`translate(${p.x},${p.y})`} style={{ cursor: 'pointer' }} onClick={() => handleChartClick('statusENER', String(value))}>
+															<text x={0} y={0} dy={16} textAnchor="middle" fontSize={12} fill="currentColor">{String(value)}</text>
+														</g>
+													);
+												}} />
 												<YAxis fontSize={12} />
 												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [value.toLocaleString('pt-BR'), 'Qtd']} />
-												<Bar dataKey="qtd" fill="url(#chartGradient)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+												<Bar dataKey="qtd" fill="url(#chartGradient)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }} onClick={(d: unknown, i: number) => {
+													const dd = d as BarDatumLike;
+													const name = (dd && (dd.name || (dd.payload && dd.payload.name))) || (filteredData.statusENER[i] && filteredData.statusENER[i].name);
+													if (name) handleChartClick('statusENER', String(name));
+												}}>
 													{filteredData.statusENER.map((entry, index) => (
 														<Cell key={`cell-${index}`} onClick={() => handleChartClick('statusENER', entry.name)} fill={activeFilters.statusENER === entry.name ? "hsl(var(--primary))" : "url(#chartGradient)"} stroke={activeFilters.statusENER === entry.name ? "hsl(var(--primary-foreground))" : "none"} strokeWidth={activeFilters.statusENER === entry.name ? 2 : 0} />
 													))}
@@ -627,14 +752,13 @@ export default function PrazosSAP() {
 								</CardContent>
 							</Card>
 
-							<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.02] hover:bg-gradient-card-hover overflow-hidden" ref={comparisonRef} tabIndex={0}>
-								<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
+								<Card className="shadow-card hover:shadow-card-hover bg-white border-gray-200 transform transition-all duration-300 hover:scale-[1.02] overflow-hidden" ref={comparisonRef} tabIndex={0}>
+								<CardHeader className="flex flex-row items-center justify-between bg-white border-b border-gray-300 rounded-t-xl">
 									<CardTitle className="text-lg font-semibold text-secondary-foreground">Comparativo por Região</CardTitle>
 									<Button
-										variant="outline"
 										size="sm"
 										onClick={() => copyChartImage(comparisonRef, 'Comparativo')}
-										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg focus:outline-none focus:ring-0 ring-0"
 										title="Copiar imagem (ou clique no gráfico e Ctrl+C)"
 									>
 										<Copy className="w-4 h-4" />
@@ -645,7 +769,15 @@ export default function PrazosSAP() {
 										<ResponsiveContainer width="100%" height="100%">
 											<BarChart data={filteredData.comparison} margin={{ top: 20, right: 20, bottom: 50, left: 20 }} barGap={4} barCategoryGap={16}>
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-												<XAxis dataKey="name" fontSize={12} tickMargin={8} />
+												<XAxis dataKey="name" fontSize={12} tickMargin={8} tick={(props: unknown) => {
+													const p = props as ChartTickProps;
+													const value = p && p.payload ? p.payload.value : '';
+													return (
+														<g transform={`translate(${p.x},${p.y})`} style={{ cursor: 'pointer' }} onClick={() => handleChartClick('comparison', String(value))}>
+															<text x={0} y={0} dy={16} textAnchor="middle" fontSize={12} fill="currentColor">{String(value)}</text>
+														</g>
+													);
+												}} />
 												<YAxis yAxisId="left" fontSize={12} />
 												<YAxis yAxisId="right" orientation="right" fontSize={12} hide />
 												<Tooltip
@@ -660,7 +792,11 @@ export default function PrazosSAP() {
 														return [num.toLocaleString('pt-BR'), 'Qtd'];
 													}}
 												/>
-												<Bar yAxisId="left" dataKey="qtd" fill="url(#chartGreenGradientComparison)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+												<Bar yAxisId="left" dataKey="qtd" fill="url(#chartGreenGradientComparison)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }} onClick={(d: unknown, i: number) => {
+													const dd = d as BarDatumLike;
+													const name = (dd && (dd.name || (dd.payload && dd.payload.name))) || (filteredData.comparison[i] && filteredData.comparison[i].name);
+													if (name) handleChartClick('comparison', String(name));
+												}}>
 													{filteredData.comparison.map((entry, index) => {
 														const highlight = activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : '');
 														const isHighlighted = highlight && highlight === entry.name;
@@ -682,7 +818,11 @@ export default function PrazosSAP() {
 														},
 													)} />
 												</Bar>
-												<Bar yAxisId="right" dataKey="value" fill="url(#chartBlueGradientValue)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+												<Bar yAxisId="right" dataKey="value" fill="url(#chartBlueGradientValue)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }} onClick={(d: unknown, i: number) => {
+													const dd = d as BarDatumLike;
+													const name = (dd && (dd.name || (dd.payload && dd.payload.name))) || (filteredData.comparison[i] && filteredData.comparison[i].name);
+													if (name) handleChartClick('comparison', String(name));
+												}}>
 													{filteredData.comparison.map((entry, index) => {
 														const highlight = activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : '');
 														const isHighlighted = highlight && highlight === entry.name;
@@ -722,14 +862,13 @@ export default function PrazosSAP() {
 								</CardContent>
 							</Card>
 
-							<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.02] hover:bg-gradient-card-hover overflow-hidden" ref={statusCONCRef} tabIndex={0}>
-								<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
+								<Card className="shadow-card hover:shadow-card-hover bg-white border-gray-200 transform transition-all duration-300 hover:scale-[1.02] overflow-hidden" ref={statusCONCRef} tabIndex={0}>
+								<CardHeader className="flex flex-row items-center justify-between bg-white border-b border-gray-300 rounded-t-xl">
 									<CardTitle className="text-lg font-semibold text-secondary-foreground">Status CONC</CardTitle>
 									<Button
-										variant="outline"
 										size="sm"
 										onClick={() => copyChartImage(statusCONCRef, 'Status CONC')}
-										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg focus:outline-none focus:ring-0 ring-0"
 										title="Copiar imagem (ou clique no gráfico e Ctrl+C)"
 									>
 										<Copy className="w-4 h-4" />
@@ -740,10 +879,22 @@ export default function PrazosSAP() {
 										<ResponsiveContainer width="100%" height="100%">
 											<BarChart data={filteredData.statusCONC} margin={{ top: 20, right: 15, bottom: 50, left: 15 }}>
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-												<XAxis dataKey="name" fontSize={12} tickMargin={8} />
+												<XAxis dataKey="name" fontSize={12} tickMargin={8} tick={(props: unknown) => {
+													const p = props as ChartTickProps;
+													const value = p && p.payload ? p.payload.value : '';
+													return (
+														<g transform={`translate(${p.x},${p.y})`} style={{ cursor: 'pointer' }} onClick={() => handleChartClick('statusCONC', String(value))}>
+															<text x={0} y={0} dy={16} textAnchor="middle" fontSize={12} fill="currentColor">{String(value)}</text>
+														</g>
+													);
+												}} />
 												<YAxis fontSize={12} />
 												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [value.toLocaleString('pt-BR'), 'Qtd']} />
-												<Bar dataKey="qtd" fill="url(#chartGreenGradientConc)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+												<Bar dataKey="qtd" fill="url(#chartGreenGradientConc)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }} onClick={(d: unknown, i: number) => {
+													const dd = d as BarDatumLike;
+													const name = (dd && (dd.name || (dd.payload && dd.payload.name))) || (filteredData.statusCONC[i] && filteredData.statusCONC[i].name);
+													if (name) handleChartClick('statusCONC', String(name));
+												}}>
 													{filteredData.statusCONC.map((entry, index) => (
 														<Cell key={`cell-${index}`} onClick={() => handleChartClick('statusCONC', entry.name)} fill={activeFilters.statusCONC === entry.name ? "hsl(var(--primary))" : "url(#chartGreenGradientConc)"} stroke={activeFilters.statusCONC === entry.name ? "hsl(var(--primary-foreground))" : "none"} strokeWidth={activeFilters.statusCONC === entry.name ? 2 : 0} />
 													))}
@@ -765,14 +916,13 @@ export default function PrazosSAP() {
 								</CardContent>
 							</Card>
 
-							<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.02] hover:bg-gradient-card-hover overflow-hidden" ref={reasonsRef} tabIndex={0}>
-								<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
+								<Card className="shadow-card hover:shadow-card-hover bg-white border-gray-200 transform transition-all duration-300 hover:scale-[1.02] overflow-hidden" ref={reasonsRef} tabIndex={0}>
+								<CardHeader className="flex flex-row items-center justify-between bg-white border-b border-gray-300 rounded-t-xl">
 									<CardTitle className="text-lg font-semibold text-secondary-foreground">Motivos</CardTitle>
 									<Button
-										variant="outline"
 										size="sm"
 										onClick={() => copyChartImage(reasonsRef, 'Motivos')}
-										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+										className="w-8 h-8 p-0 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg focus:outline-none focus:ring-0 ring-0"
 										title="Copiar imagem (ou clique no gráfico e Ctrl+C)"
 									>
 										<Copy className="w-4 h-4" />
@@ -783,10 +933,22 @@ export default function PrazosSAP() {
 										<ResponsiveContainer width="100%" height="100%">
 											<BarChart data={filteredData.reasons} margin={{ top: 20, right: 15, bottom: 50, left: 15 }}>
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-												<XAxis dataKey="name" fontSize={12} tickMargin={8} />
+												<XAxis dataKey="name" fontSize={12} tickMargin={8} tick={(props: unknown) => {
+													const p = props as ChartTickProps;
+													const value = p && p.payload ? p.payload.value : '';
+													return (
+														<g transform={`translate(${p.x},${p.y})`} style={{ cursor: 'pointer' }} onClick={() => handleChartClick('reasons', String(value))}>
+															<text x={0} y={0} dy={16} textAnchor="middle" fontSize={12} fill="currentColor">{String(value)}</text>
+														</g>
+													);
+												}} />
 												<YAxis fontSize={12} />
 												<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value: number) => [value.toLocaleString('pt-BR'), 'Qtd']} />
-												<Bar dataKey="qtd" fill="url(#chartGreenGradientReasons)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }}>
+												<Bar dataKey="qtd" fill="url(#chartGreenGradientReasons)" radius={[8, 8, 0, 0]} style={{ cursor: 'pointer' }} onClick={(d: unknown, i: number) => {
+													const dd = d as BarDatumLike;
+													const name = (dd && (dd.name || (dd.payload && dd.payload.name))) || (filteredData.reasons[i] && filteredData.reasons[i].name);
+													if (name) handleChartClick('reasons', String(name));
+												}}>
 													{filteredData.reasons.map((entry, index) => (
 														<Cell key={`cell-${index}`} onClick={() => handleChartClick('reasons', entry.name)} fill={activeFilters.reasons === entry.name ? "hsl(var(--primary))" : "url(#chartGreenGradientReasons)"} stroke={activeFilters.reasons === entry.name ? "hsl(var(--primary-foreground))" : "none"} strokeWidth={activeFilters.reasons === entry.name ? 2 : 0} />
 													))}
@@ -810,21 +972,20 @@ export default function PrazosSAP() {
 						</div>
 					</div>
 
-					<Card className="shadow-card hover:shadow-card-hover bg-gradient-card backdrop-blur-sm border-gray-200 transform transition-all duration-300 hover:scale-[1.01]">
-						<CardHeader className="flex flex-row items-center justify-between border-b border-gray-300 bg-gradient-secondary/40 backdrop-blur-sm rounded-t-xl">
+					<Card className="shadow-card hover:shadow-card-hover bg-white border-gray-200 transform transition-all duration-300 hover:scale-[1.01]">
+						<CardHeader className="flex flex-row items-center justify-between bg-white border-b border-gray-300 rounded-t-xl">
 							<CardTitle className="text-lg font-semibold text-secondary-foreground">Matriz de Prazos SAP</CardTitle>
 							<Button
-								variant="outline"
 								size="sm"
 								onClick={handleExportExcel}
-								className="flex items-center gap-2 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
+								className="flex items-center gap-2 text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg focus:outline-none focus:ring-0 ring-0"
 							>
 								<Copy className="w-4 h-4" />
 								Exportar Excel
 							</Button>
 						</CardHeader>
 						<CardContent className="p-0">
-							<div className="overflow-x-auto">
+							<div className="overflow-x-auto" ref={tableWrapperRef}>
 								<Table>
 									<TableHeader>
 										<TableRow className="bg-gray-50 hover:bg-gray-100">
@@ -847,7 +1008,94 @@ export default function PrazosSAP() {
 									</TableHeader>
 									<TableBody>
 										{filteredData.matrix.map((row, index) => (
-											<TableRow key={index} className={cn("cursor-pointer transition-all duration-200 select-none", selectedMatrixRow === row.pep ? "bg-green-50 border-l-4 border-l-green-600 shadow-md hover:bg-green-100" : "hover:bg-gray-50")} onClick={() => setSelectedMatrixRow(row.pep)}>
+											<TableRow
+												data-row-index={index}
+												key={index}
+												className={cn(
+													"cursor-pointer transition-all duration-200 select-none",
+													(Array.isArray(selectedMatrixRows) && selectedMatrixRows.includes(row.pep))
+														? "bg-green-50 border-l-4 border-l-green-600 shadow-md hover:bg-green-100"
+														: "hover:bg-gray-50"
+												)}
+												onClick={(e: React.MouseEvent) => {
+												// Shift+click => range select (preserva seleção existente fora do intervalo)
+												if (e.shiftKey && typeof lastSelectedIndex === 'number' && lastSelectedIndex !== null) {
+													e.preventDefault();
+													const start = Math.min(lastSelectedIndex, index);
+													const end = Math.max(lastSelectedIndex, index);
+													const range = filteredData.matrix.slice(start, end + 1).map(r => r.pep);
+													setSelectedMatrixRows(prev => {
+														const preserved = Array.isArray(prev) ? prev.filter(p => {
+															const idx = filteredData.matrix.findIndex(r => r.pep === p);
+															return idx === -1 || idx < start || idx > end; // mantém itens fora do novo intervalo
+														}) : [];
+														return Array.from(new Set([...preserved, ...range]));
+													});
+													setLastSelectedIndex(index);
+													scrollToRow(index);
+													return;
+												}
+												// Ctrl (Windows/Linux) ou Meta (Mac) -> toggle selection
+												if ((e.ctrlKey || e.metaKey)) {
+													e.preventDefault();
+													setSelectedMatrixRows(prev => {
+														if (Array.isArray(prev) && prev.includes(row.pep)) return prev.filter(p => p !== row.pep);
+														return Array.isArray(prev) ? [...prev, row.pep] : [row.pep];
+													});
+													// atualiza índice do último clique
+													setLastSelectedIndex(index);
+													scrollToRow(index);
+												} else {
+													// single selection
+													setSelectedMatrixRows([row.pep]);
+													setLastSelectedIndex(index);
+													scrollToRow(index);
+												}
+												}
+											}
+											onContextMenu={(e: React.MouseEvent) => {
+												e.preventDefault();
+												// open reusable context menu with two actions
+												const cx = e.clientX;
+												const cy = e.clientY;
+												setContextPos({ x: cx, y: cy });
+												setContextItems([
+													{
+														id: 'copy-servicos',
+														label: 'COPIAR SERVIÇOS',
+														onClick: () => {
+															const selected = (Array.isArray(selectedMatrixRows) && selectedMatrixRows.length) ? selectedMatrixRows : [row.pep];
+															const lines = filteredData.matrix.filter(r => selected.includes(r.pep)).map(r => r.pep);
+															navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('Serviços copiados!')).catch(() => showToast('Erro ao copiar'));
+															setContextOpen(false);
+														}
+													},
+													{
+														id: 'copy-table',
+														label: 'COPIAR TABELA',
+														onClick: () => {
+															const selected = (Array.isArray(selectedMatrixRows) && selectedMatrixRows.length) ? selectedMatrixRows : [row.pep];
+															const rowsToCopy = filteredData.matrix.filter(r => selected.includes(r.pep));
+															const tsv = rowsToCopy.map(r => [r.pep, r.prazo, r.dataConclusao, r.status, r.rs].join('\t')).join('\n');
+															navigator.clipboard.writeText(tsv).then(() => showToast('Tabela copiada!')).catch(() => showToast('Erro ao copiar'));
+															setContextOpen(false);
+														}
+													}
+												]);
+												setContextOpen(true);
+											}}
+											onAuxClick={(e: React.MouseEvent) => {
+												// botão do meio (wheel/middle) geralmente tem button === 1
+												if ((e as React.MouseEvent).button === 1) {
+													e.preventDefault();
+													const raw = String(row.rs || '0');
+													navigator.clipboard.writeText(raw).then(() => {
+													showToast(`Valor R$ ${row.rs.toLocaleString('pt-BR')} copiado!`);
+													}).catch(() => showToast('Erro ao copiar valor'));
+												}
+											}}
+											title="Ctrl/Cmd+clique para selecionar múltiplas linhas. Clique com o botão direito para abrir menu de copiar"
+											>
 												<TableCell className="font-mono text-sm">{row.pep}</TableCell>
 												<TableCell className="text-sm">{row.prazo}</TableCell>
 												<TableCell className="text-sm">{row.dataConclusao}</TableCell>
@@ -866,6 +1114,14 @@ export default function PrazosSAP() {
 					</Card>
 				</main>
 			</div>
+
+		{/* Context menu shared component */}
+		<ContextMenu
+			open={contextOpen}
+			position={contextPos}
+			items={contextItems}
+			onClose={() => setContextOpen(false)}
+		/>
 		</div>
 	);
 }

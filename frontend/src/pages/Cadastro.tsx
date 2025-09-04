@@ -14,9 +14,10 @@ export default function Cadastro() {
   const [email, setEmail] = useState('')
   const [matricula, setMatricula] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [usernameTouched, setUsernameTouched] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [usernameTouched, setUsernameTouched] = useState(false)
+   const [emailError, setEmailError] = useState<string | null>(null)
   // cooldown de reenvio por e-mail (2 min)
   const COOLDOWN_MS = 2 * 60 * 1000
   const [firstSentAt, setFirstSentAt] = useState<number | null>(null)
@@ -66,6 +67,11 @@ export default function Cadastro() {
     })()
   }, [location.search, navigate])
 
+  // Define o título da página
+  useEffect(() => {
+    document.title = 'Novo Cadastro'
+  }, [])
+
   // Carrega timestamp do primeiro envio para o e-mail atual (se existir)
   useEffect(() => {
     const key = email ? `register_firstSentAt:${email.trim().toLowerCase()}` : ''
@@ -81,7 +87,7 @@ export default function Cadastro() {
       setFirstSentAt(null)
       setRemainingSeconds(0)
     }
-  }, [email])
+  }, [email, COOLDOWN_MS])
 
   // Atualiza contador a cada 1s quando em cooldown
   useEffect(() => {
@@ -95,13 +101,13 @@ export default function Cadastro() {
       }
     }, 1000)
     return () => window.clearInterval(id)
-  }, [firstSentAt])
+  }, [firstSentAt, COOLDOWN_MS])
 
   const emailTrim = email.trim()
   const emailOk = useMemo(() => /@[gG][rR][uU][pP][oO][sS][eE][tT][uU][pP]\.com$/i.test(emailTrim), [emailTrim])
   const passwordOk = useMemo(() => password.length > 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /[^A-Za-z0-9]/.test(password), [password])
   const confirmOk = confirmPassword === password
-  const formValid = emailOk && matricula.trim().length > 0 && passwordOk && confirmOk
+  const formValid = emailOk && username.trim().length > 0 && matricula.trim().length > 0 && passwordOk && confirmOk
 
   function saveFirstSentNow(currentEmail: string) {
     const key = `register_firstSentAt:${currentEmail.trim().toLowerCase()}`
@@ -130,6 +136,10 @@ export default function Cadastro() {
     }
     if (!matricula.trim()) {
       toast.error('Informe a matrícula')
+      return
+    }
+    if (!username.trim()) {
+      toast.error('Informe o usuário')
       return
     }
     if (!password) {
@@ -169,7 +179,7 @@ export default function Cadastro() {
     ;(async () => {
       try {
         const isResend = !!firstSentAt
-        await api.register({
+        const resp = await api.register({
           username: username.trim() || emailTrim.split('@')[0],
           email: emailTrim,
           matricula: matricula.trim(),
@@ -177,7 +187,11 @@ export default function Cadastro() {
         })
         // Marca o horário do envio para controle do cooldown
         saveFirstSentNow(emailTrim)
+        setEmailError(null)
         toast.success(isResend ? 'Email de Confirmação Reenviado.' : 'Cadastro recebido! Verifique seu e-mail para confirmar.')
+        if (resp?.debug_verify_link) {
+          toast.message('Link de verificação (dev): ' + resp.debug_verify_link)
+        }
       } catch (err: unknown) {
         let msg = 'Falha ao cadastrar'
         if (typeof err === 'object' && err && 'response' in err) {
@@ -188,7 +202,36 @@ export default function Cadastro() {
             const emailErr = data?.email
             const userErr = data?.username
             const passErr = data?.password
-            msg = String(detail || emailErr || userErr || passErr || msg)
+            const detailStr = typeof detail === 'string' ? detail : ''
+
+            // normalizar acentos e comparar
+            const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+            if (detailStr && norm(detailStr).includes('usuario ja ativo')) {
+              msg = 'Email ja Cadastrado.'
+              setEmailError('Email ja Cadastrado.')
+            } else if (typeof emailErr === 'string' || Array.isArray(emailErr)) {
+              // Qualquer erro de email duplicado vira mensagem padronizada
+              msg = 'Email ja Cadastrado.'
+              setEmailError('Email ja Cadastrado.')
+            } else if (typeof userErr === 'string') {
+              const u = norm(userErr)
+              if (u.includes('ja existe') || u.includes('already exists')) {
+                msg = 'Email ja Cadastrado.'
+                setEmailError('Email ja Cadastrado.')
+              } else {
+                msg = String(userErr)
+              }
+            } else if (Array.isArray(userErr) && userErr.length > 0) {
+              const u0 = norm(String(userErr[0]))
+              if (u0.includes('ja existe') || u0.includes('already exists')) {
+                msg = 'Email ja Cadastrado.'
+                setEmailError('Email ja Cadastrado.')
+              } else {
+                msg = String(userErr[0])
+              }
+            } else {
+              msg = String(detail || passErr || msg)
+            }
           }
         }
         toast.error(msg)
@@ -196,28 +239,7 @@ export default function Cadastro() {
     })()
   }
 
-  const handleResend = async () => {
-    if (!formValid) {
-      toast.error('Preencha os campos corretamente antes de reenviar.')
-      return
-    }
-    if (remainingSeconds > 0) {
-      toast.message('Confirmação de Email já Enviado')
-      return
-    }
-    try {
-      await api.register({
-        username: username.trim() || emailTrim.split('@')[0],
-        email: emailTrim,
-        matricula: matricula.trim(),
-        password: password,
-      })
-      saveFirstSentNow(emailTrim)
-      toast.success('Email de Confirmação Reenviado.')
-    } catch (err) {
-      toast.error('Falha ao reenviar o e-mail de confirmação')
-    }
-  }
+  // reenvio agora é feito pelo próprio botão de submit quando já houve um envio prévio
 
   return (
   <div className="relative min-h-screen p-4 bg-transparent">
@@ -243,12 +265,26 @@ export default function Cadastro() {
               onChange={(e)=>{
                 const value = e.target.value
                 setEmail(value)
+                setEmailError(null)
                 const localPart = value.split('@')[0]?.trim() ?? ''
                 if (!usernameTouched) {
                   setUsername(localPart)
                 }
               }}
               placeholder="seu.nome@gruposetup.com"
+              required
+            />
+            {emailError ? (
+              <p className="mt-1 text-xs text-red-600">{emailError}</p>
+            ) : null}
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-700">Usuário</label>
+            <input
+              className="w-full px-3 py-2 border rounded"
+              value={username}
+              onChange={(e)=>{ setUsernameTouched(true); setUsername(e.target.value) }}
+              placeholder="Seu usuário"
               required
             />
           </div>
@@ -260,15 +296,6 @@ export default function Cadastro() {
               onChange={(e)=>setMatricula(e.target.value)}
               placeholder="Sua matrícula"
               required
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm text-gray-700">Usuário</label>
-            <input
-              className="w-full px-3 py-2 border rounded"
-              value={username}
-              onChange={(e)=>{ setUsername(e.target.value); setUsernameTouched(true) }}
-              placeholder="Seu usuário"
             />
           </div>
           <div className="space-y-1">
@@ -295,26 +322,26 @@ export default function Cadastro() {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-              <div className="mt-2 -mx-1 overflow-x-auto">
-                <div className="inline-flex items-center gap-2 sm:gap-3 whitespace-nowrap text-[11px] sm:text-xs text-gray-600 px-1">
-                  <div className="flex items-center gap-1">
-                    <span>8 Dígitos</span>
-                    <span className={`inline-block h-2 w-2 rounded-full ${policy.length ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>Maiúscula</span>
-                    <span className={`inline-block h-2 w-2 rounded-full ${policy.upper ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>Minúscula</span>
-                    <span className={`inline-block h-2 w-2 rounded-full ${policy.lower ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>Caractere Especial</span>
-                    <span className={`inline-block h-2 w-2 rounded-full ${policy.special ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                  </div>
+            <div className="mt-2 -mx-1 overflow-x-auto">
+              <div className="inline-flex items-center gap-2 sm:gap-3 whitespace-nowrap text-[11px] sm:text-xs text-gray-600 px-1">
+                <div className="flex items-center gap-1">
+                  <span>8 Dígitos</span>
+                  <span className={`inline-block h-2 w-2 rounded-full ${policy.length ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Maiúscula</span>
+                  <span className={`inline-block h-2 w-2 rounded-full ${policy.upper ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Minúscula</span>
+                  <span className={`inline-block h-2 w-2 rounded-full ${policy.lower ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Caractere Especial</span>
+                  <span className={`inline-block h-2 w-2 rounded-full ${policy.special ? 'bg-emerald-500' : 'bg-gray-300'}`} />
                 </div>
               </div>
+            </div>
           </div>
           <div className="space-y-1">
             <label className="text-sm text-gray-700">Confirmar Senha</label>
@@ -352,22 +379,18 @@ export default function Cadastro() {
               }
             </p>
           </div>
-          <button type="submit" className="w-full py-2 text-white rounded bg-emerald-600">Cadastrar</button>
+          <button
+            type="submit"
+            disabled={!formValid}
+            className={`relative w-full py-2 rounded px-3 ${formValid ? 'bg-emerald-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+          >
+            <span className={`absolute right-3 top-1/2 -translate-y-1/2 tabular-nums ${formValid ? 'text-white/90' : 'text-gray-600'}`}>
+              {remainingSeconds > 0 ? formatMMSS(remainingSeconds) : ''}
+            </span>
+            <span className="block w-full text-center">{firstSentAt ? 'Reenviar Email' : 'Cadastrar'}</span>
+          </button>
         </form>
-        <div className="mt-2 flex items-center justify-between text-sm">
-          <Link to="/login" className="text-emerald-700 hover:underline">Voltar ao Login</Link>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={!formValid || remainingSeconds > 0}
-              className={`px-3 py-1 rounded border ${(!formValid || remainingSeconds>0) ? 'text-gray-400 border-gray-200' : 'text-emerald-700 border-emerald-600 hover:bg-emerald-50'}`}
-            >
-              Reenviar Email
-            </button>
-            <span className="text-gray-500 tabular-nums">{remainingSeconds > 0 ? formatMMSS(remainingSeconds) : '00:00'}</span>
-          </div>
-        </div>
+        <Link to="/login" className="block mt-2 text-sm text-center text-emerald-700 hover:underline">Voltar ao Login</Link>
       </div>
     </div>
   )

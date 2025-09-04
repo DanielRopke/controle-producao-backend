@@ -112,7 +112,7 @@ function Obras() {
 
   return (
     <div className="relative h-screen overflow-hidden text-white bg-transparent">
-      <FundoAnimado />
+      <FundoAnimado showBadge={false} />
 
       {/* Header fixo, estilo PrazosSAP */}
   <header className="fixed top-0 left-0 right-0 z-50 border-b border-green-500 shadow-md bg-gradient-to-r from-green-600 via-green-600/90 to-green-700">
@@ -210,7 +210,7 @@ function Obras() {
         </div>
         {/* Botão posicionado para alinhar a direita com o grid (95vw => margem de 2.5vw dos lados) */}
         <div className="absolute top-0 right-[2.5vw] h-16 flex items-center z-[60]">
-          <div className="relative group rounded-xl">
+          <div className="relative group rounded-xl transition-transform duration-200 will-change-transform hover:scale-105 active:scale-100">
             <button
               onClick={handleGoHome}
               className="relative inline-flex items-center h-10 gap-2 px-4 font-bold text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
@@ -235,8 +235,9 @@ function Obras() {
             {/* Contorno neon contínuo igual ao dos botões/cards */}
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 transition-opacity duration-200 opacity-0 rounded-xl group-hover:opacity-100 group-hover:[animation:gradient-rotate_2.2s_linear_infinite]"
+              className="pointer-events-none absolute inset-0 rounded-xl opacity-100 [animation:gradient-rotate_2.2s_linear_infinite]"
               style={{
+                // espessura igual à do painel do logo (2px)
                 padding: '2px',
                 background:
                   'conic-gradient(from var(--gangle, 0deg) at 50% 50%, hsl(142 76% 36%) 0deg, #39FF14 140deg, #39FF14 180deg, hsl(142 76% 36%) 360deg)',

@@ -12,7 +12,7 @@ function Home() {
 
   return (
     <div className="relative h-screen overflow-hidden text-white bg-transparent">
-      <FundoAnimado />
+  <FundoAnimado showBadge={false} />
 
       {/* Header fixo, estilo Obras */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-green-500 shadow-md bg-gradient-to-r from-green-600 via-green-600/90 to-green-700">
@@ -85,18 +85,36 @@ function Home() {
         </div>
         {/* Botão Sair alinhado como o botão Início da página Obras */}
         <div className="absolute top-0 right-[2.5vw] h-16 flex items-center z-[60]">
-          <div className="relative group rounded-xl">
+          <div className="relative transition-transform duration-200 group rounded-xl will-change-transform hover:scale-105 active:scale-100">
             <button
               onClick={handleLogout}
               className="relative inline-flex items-center h-10 gap-2 px-4 font-bold text-gray-700 transition-all duration-200 bg-white border border-gray-300 shadow-md rounded-xl hover:bg-gray-50 hover:shadow-lg"
               title="Sair"
             >
+              {/* Ícone Logout (porta com seta) com traços grossos e mesmo degradê do botão Início em Obras */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="logoutIconGradient" x1="0" y1="0" x2="0" y2="24" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#39FF14" />
+                    <stop offset="60%" stopColor="hsl(142 85% 42%)" />
+                    <stop offset="100%" stopColor="hsl(142 76% 36%)" />
+                  </linearGradient>
+                </defs>
+                {/* Porta (um pouco mais estreita) */}
+                <path d="M7 5.5h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7z" stroke="url(#logoutIconGradient)" strokeWidth="2.4" strokeLinejoin="round" />
+                {/* Maçaneta */}
+                <circle cx="11.5" cy="12" r="0.9" fill="url(#logoutIconGradient)" />
+                {/* Seta de saída (mais à direita) */}
+                <path d="M17 8l4 4-4 4" stroke="url(#logoutIconGradient)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+                {/* Linha até antes da porta para criar um vão claro */}
+                <path d="M21 12H13.5" stroke="url(#logoutIconGradient)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
               <span>Sair</span>
             </button>
-            {/* Contorno neon com mesmo efeito degrade e rotação no hover */}
+            {/* Contorno neon sempre aparente, 2px como o painel do logo */}
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 transition-opacity duration-200 opacity-0 rounded-xl group-hover:opacity-100 group-hover:[animation:gradient-rotate_2.2s_linear_infinite]"
+              className="pointer-events-none absolute inset-0 rounded-xl opacity-100 [animation:gradient-rotate_2.2s_linear_infinite]"
               style={{
                 padding: '2px',
                 background:

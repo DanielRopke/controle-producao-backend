@@ -1,17 +1,42 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
+import { login } from '../services/api';
+import { toast } from 'sonner';
 import logo from '../assets/LogoSetup.png';
 
-interface LoginProps {
-  onLogin: () => void;
-}
-
-export default function Login({ onLogin }: LoginProps) {
+export default function Login() {
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin();
+    try {
+      await login(usuario.trim(), senha.trim());
+      localStorage.setItem('logado', 'true');
+      toast.success('Login realizado');
+      window.location.href = '/home';
+    } catch (err: unknown) {
+      let status: number | undefined
+      let msg: string | undefined
+      if (typeof err === 'object' && err !== null) {
+        const e = err as { response?: { status?: number; data?: unknown }; message?: string }
+        status = e.response?.status
+        if (e.response && typeof e.response === 'object') {
+          const data = (e.response as { data?: unknown }).data
+          if (data && typeof data === 'object' && 'detail' in data) {
+            msg = String((data as Record<string, unknown>).detail)
+          }
+        }
+        msg = msg || e.message
+      }
+      if (status === 401) {
+        toast.error('Credenciais inválidas');
+      } else {
+        toast.error(msg || 'Falha ao conectar ao servidor');
+      }
+    }
   };
 
   return (
@@ -103,15 +128,26 @@ export default function Login({ onLogin }: LoginProps) {
             >
               Senha:
             </label>
-            <input
-              id="senha"
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="Digite sua Senha"
-              className="p-2 rounded border border-gray-300 text-center text-black"
-              required
-            />
+            <div className="relative">
+              <input
+                id="senha"
+                type={showPassword ? 'text' : 'password'}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="Digite sua Senha"
+                className="p-2 pr-10 rounded border border-gray-300 text-center text-black w-full"
+                required
+                aria-label="Senha"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
           {/* Botão Entrar */}
@@ -125,6 +161,21 @@ export default function Login({ onLogin }: LoginProps) {
             </button>
           </div>
         </form>
+        {/* Ações adicionais */}
+        <div className="w-[200px] flex items-center justify-between gap-2 mt-2">
+          <Link
+            to="/cadastro"
+            className="flex-1 text-center text-sm py-2 rounded border border-white/60 text-white hover:bg-white/10 transition"
+          >
+            Novo Cadastro
+          </Link>
+          <Link
+            to="/recuperacao-senha"
+            className="flex-1 text-center text-sm py-2 rounded border border-white/60 text-white hover:bg-white/10 transition"
+          >
+            Esqueci a Senha
+          </Link>
+        </div>
       </div>
     </div>
   );
