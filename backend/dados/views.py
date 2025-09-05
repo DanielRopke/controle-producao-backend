@@ -211,6 +211,33 @@ def test_send_email(request):
         return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
 
+# Debug endpoint to confirm environment values read by the running process.
+# Returns EMAIL_HOST_USER, EMAIL_HOST, EMAIL_PORT, EMAIL_USE_TLS and only the
+# length of EMAIL_HOST_PASSWORD so we don't expose secrets. Protected by the
+# same TEST_EMAIL_SECRET header used by test_send_email.
+@csrf_exempt
+def debug_env(request):
+    secret = os.environ.get('TEST_EMAIL_SECRET')
+    if not secret:
+        return HttpResponseForbidden('TEST_EMAIL_SECRET not configured')
+
+    header = request.headers.get('X-TEST-EMAIL-SECRET') or request.META.get('HTTP_X_TEST_EMAIL_SECRET')
+    if header != secret:
+        return HttpResponseForbidden('invalid secret')
+
+    # Read settings/env safely
+    pwd = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    data = {
+        'email_host_user': os.environ.get('EMAIL_HOST_USER') or getattr(settings, 'EMAIL_HOST_USER', None),
+        'email_host': os.environ.get('EMAIL_HOST') or getattr(settings, 'EMAIL_HOST', None),
+        'email_port': os.environ.get('EMAIL_PORT') or getattr(settings, 'EMAIL_PORT', None),
+        'email_use_tls': os.environ.get('EMAIL_USE_TLS') or getattr(settings, 'EMAIL_USE_TLS', None),
+        'email_password_length': len(pwd),
+        'deploy_info': os.environ.get('RENDER_SERVICE_ID') or os.environ.get('RENDER_DEPLOY_ID') or None,
+    }
+    return JsonResponse({'ok': True, 'env': data})
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def geral(request):
