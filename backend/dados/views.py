@@ -114,8 +114,10 @@ def auth_register(request):
         )
         try:
             send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [existing.email], fail_silently=False)
-        except Exception:
-            print('Verification link:', verify_link)
+        except Exception as e:
+            # Log detalhado para depuração em produção
+            print('ERROR sending verification email (resend):', repr(e))
+            print('Verification link (resend):', verify_link)
         resp = {'message': 'Reenviamos o e-mail de verificação.'}
         if getattr(settings, 'DEBUG', False):
             resp['debug_verify_link'] = verify_link
@@ -140,9 +142,10 @@ def auth_register(request):
     )
     try:
         send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
-    except Exception:
-        # Fallback: logar no console do servidor
-        print('Verification link:', verify_link)
+    except Exception as e:
+        # Fallback: logar detalhes no console do servidor
+        print('ERROR sending verification email (register):', repr(e))
+        print('Verification link (register):', verify_link)
 
     resp = {'message': 'Cadastro recebido. Verifique seu e-mail para ativar a conta.'}
     if getattr(settings, 'DEBUG', False):
