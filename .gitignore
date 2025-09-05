@@ -31,3 +31,5 @@ backend/*.log
 node_modules
 backend/NUL
 backend/nul
+smtp_test.py
+variaveis
