@@ -207,25 +207,25 @@ export default function Cadastro() {
             // normalizar acentos e comparar
             const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
             if (detailStr && norm(detailStr).includes('usuario ja ativo')) {
-              msg = 'Email ja Cadastrado.'
-              setEmailError('Email ja Cadastrado.')
+              msg = 'Email já Cadastrado'
+              setEmailError('Email já Cadastrado')
             } else if (typeof emailErr === 'string' || Array.isArray(emailErr)) {
               // Qualquer erro de email duplicado vira mensagem padronizada
-              msg = 'Email ja Cadastrado.'
-              setEmailError('Email ja Cadastrado.')
+              msg = 'Email já Cadastrado'
+              setEmailError('Email já Cadastrado')
             } else if (typeof userErr === 'string') {
               const u = norm(userErr)
               if (u.includes('ja existe') || u.includes('already exists')) {
-                msg = 'Email ja Cadastrado.'
-                setEmailError('Email ja Cadastrado.')
+                msg = 'Email já Cadastrado'
+                setEmailError('Email já Cadastrado')
               } else {
                 msg = String(userErr)
               }
             } else if (Array.isArray(userErr) && userErr.length > 0) {
               const u0 = norm(String(userErr[0]))
               if (u0.includes('ja existe') || u0.includes('already exists')) {
-                msg = 'Email ja Cadastrado.'
-                setEmailError('Email ja Cadastrado.')
+                msg = 'Email já Cadastrado'
+                setEmailError('Email já Cadastrado')
               } else {
                 msg = String(userErr[0])
               }
