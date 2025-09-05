@@ -28,6 +28,11 @@ def colunas_planilha(request):
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from django.http import JsonResponse, HttpResponseForbidden
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+import json
+import logging
 import threading
 import time
 
@@ -171,6 +176,39 @@ def auth_verify_email(request):
     user.is_active = True
     user.save(update_fields=['is_active'])
     return Response({'message': 'Conta verificada com sucesso.'})
+
+
+# Endpoint temporário para testar envio SMTP sem tocar no fluxo de cadastro.
+# Protegido por header X-TEST-EMAIL-SECRET que deve bater com a variável
+# de ambiente TEST_EMAIL_SECRET.
+@csrf_exempt
+@require_POST
+def test_send_email(request):
+    secret = os.environ.get('TEST_EMAIL_SECRET')
+    if not secret:
+        return HttpResponseForbidden('TEST_EMAIL_SECRET not configured')
+
+    header = request.headers.get('X-TEST-EMAIL-SECRET') or request.META.get('HTTP_X_TEST_EMAIL_SECRET')
+    if header != secret:
+        return HttpResponseForbidden('invalid secret')
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+        frm = payload.get('from') or getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+        to = payload.get('to')
+        subj = payload.get('subject', 'Teste de envio')
+        msg = payload.get('message', 'Mensagem de teste')
+
+        if not frm or not to:
+            return JsonResponse({'ok': False, 'error': 'from and to required'}, status=400)
+
+        # Envia o e-mail (levanta exceção em caso de falha para log completo)
+        send_mail(subj, msg, frm, [to], fail_silently=False)
+        return JsonResponse({'ok': True, 'message': 'Email enviado'})
+    except Exception as e:
+        # Log detalhado para investigação nos logs do Render
+        logging.exception('ERROR sending test email')
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
 
 @api_view(['GET'])
