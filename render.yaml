@@ -1,3 +1,21 @@
+services:
+  - type: web
+    name: controle-producao-backend
+    env: python
+    plan: free
+    region: oregon
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r backend/requirements.txt
+    startCommand: gunicorn backend_project.wsgi:application --chdir backend
+    postDeployCommand: |
+      python backend/manage.py migrate --noinput
+      python backend/manage.py collectstatic --noinput || true
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: backend_project.settings
+      - key: PYTHONPATH
+        value: .
 # Render Blueprint: Backend (Django) + Frontend (Vite Static)
 services:
   - type: web
