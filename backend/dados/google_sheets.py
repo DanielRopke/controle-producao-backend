@@ -1,8 +1,18 @@
 import os
 import json
 import base64
+import unicodedata
 import gspread
 from google.oauth2.service_account import Credentials
+
+def _normalize_name(s: str) -> str:
+    if not s:
+        return ''
+    # Remove acentos e normaliza para comparação case-insensitive
+    nfd = unicodedata.normalize('NFD', s)
+    no_diac = ''.join(ch for ch in nfd if unicodedata.category(ch) != 'Mn')
+    return no_diac.strip().lower()
+
 
 def get_sheet(sheet_name):
     """
@@ -38,7 +48,32 @@ def get_sheet(sheet_name):
         print(f"[get_sheet] Abrindo planilha com ID: {spreadsheet_id}")
         spreadsheet = client.open_by_key(spreadsheet_id)
         print(f"[get_sheet] Buscando aba: {sheet_name}")
-        worksheet = spreadsheet.worksheet(sheet_name)
+        try:
+            worksheet = spreadsheet.worksheet(sheet_name)
+        except Exception as exc:
+            print(f"[get_sheet] Worksheet exata '{sheet_name}' não encontrada: {exc}. Tentando busca normalizada...")
+            target = _normalize_name(sheet_name)
+            worksheet = None
+            try:
+                for ws in spreadsheet.worksheets():
+                    if _normalize_name(ws.title) == target:
+                        worksheet = ws
+                        print(f"[get_sheet] Worksheet encontrada por nome normalizado: '{ws.title}'")
+                        break
+            except Exception as e2:
+                print("[get_sheet] Falha ao listar worksheets:", e2)
+            if worksheet is None:
+                # Tentativas comuns: variantes de 'programacao'/'programação'
+                aliases = [sheet_name, 'Programação', 'programação', 'Programacao', 'programacao']
+                for alias in aliases:
+                    try:
+                        worksheet = spreadsheet.worksheet(alias)
+                        print(f"[get_sheet] Worksheet encontrada por alias: '{alias}'")
+                        break
+                    except Exception:
+                        continue
+            if worksheet is None:
+                raise
         print(f"[get_sheet] Worksheet encontrada: {worksheet.title}")
         records = worksheet.get_all_records()
         print(f"[get_sheet] Registros encontrados: {len(records)}")
