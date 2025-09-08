@@ -2,7 +2,7 @@
 
 import { useNavigate } from 'react-router-dom'
 import { SidebarFiltros } from './components/SidebarFiltros'
-import { GraficoBarras } from './components/GraficoBarras'
+// import { GraficoBarras } from './components/GraficoBarras'
 import { TabelaMatriz } from './components/TabelaMatriz'
 import { useFiltros } from './hooks/useFiltros'
 import { useDadosGraficos } from './hooks/useDadosGraficos'
@@ -49,24 +49,27 @@ export default function PrazosSAP() {
   } = useDadosGraficos({ seccionais: seccionaisSelecionadas, statusSap, tipo, mes });
 
   // Estado de filtros ativos para filtragem cruzada
-  const [activeFilters, setActiveFilters] = useState({
-    statusENER: undefined,
-    statusCONC: undefined,
-    comparison: undefined,
-    reasons: undefined
-  });
+  const [activeFilters, setActiveFilters] = useState<{
+    statusENER?: string;
+    statusCONC?: string;
+    comparison?: string; // seccional
+    reasons?: string;    // motivo/status serviço
+  }>({});
 
   // Função para clique nas colunas dos gráficos
-  function handleChartClick(chartType, dataPoint) {
-    setActiveFilters(prev => {
-      if (prev[chartType] === dataPoint.name) {
-        // Remove filtro se já está ativo
-        return { ...prev, [chartType]: undefined };
-      } else {
-        // Ativa filtro
-        return { ...prev, [chartType]: dataPoint.name };
-      }
-    });
+  function handleChartClick(
+    chartType: 'statusENER'|'statusCONC'|'comparison'|'reasons',
+    dataPoint: { payload?: unknown; [k: string]: any }
+  ) {
+    const payload = dataPoint && (dataPoint.payload || dataPoint) as any;
+    const value = chartType === 'comparison'
+      ? payload?.seccional
+      : (payload?.status ?? payload?.name);
+    if (!value) return;
+    setActiveFilters(prev => ({
+      ...prev,
+      [chartType]: prev[chartType] === value ? undefined : value
+    }));
   }
 
   // Lógica de filtragem cruzada (igual ao lovable)
@@ -77,57 +80,63 @@ export default function PrazosSAP() {
     graficoSeccionalRSOrdenado,
     matrizFiltrada
   } = useMemo(() => {
-    // Processa dados originais
-    let dadosEner = processarDados(graficoEner, false, { seccionais: seccionaisSelecionadas }).slice();
-    let dadosConc = processarDados(graficoConc, true, { seccionais: seccionaisSelecionadas }).slice();
-    let dadosServico = processarDados(graficoServico, false, { seccionais: seccionaisSelecionadas }).slice();
-    let graficoSeccionalRSOrdenado = Array.isArray(graficoSeccionalRS)
-      ? graficoSeccionalRS.slice().sort((a, b) => (b.totalRS ?? 0) - (a.totalRS ?? 0))
-      : graficoSeccionalRS;
-    let matrizFiltrada = matriz.slice();
+    // Base de seccionais a considerar (já vem filtradas por seccionaisSelecionadas via hook)
+    const allSeccsSet = new Set<string>(
+      (Array.isArray(graficoSeccionalRS) ? graficoSeccionalRS : []).map(g => g.seccional)
+    );
 
-    // Filtro cruzado: se algum filtro ativo, recalcula os dados dos outros gráficos
+    // Conjuntos derivados dos filtros ativos
+    const sets: Array<Set<string>> = [];
+
     if (activeFilters.comparison) {
-      // Filtra outros gráficos baseado na seccional selecionada
-      const selected = activeFilters.comparison;
-      dadosEner = dadosEner.map(item => ({ ...item, count: Math.round((item.count ?? 0) * (selected === 'Sul' ? 1.2 : selected === 'Litoral Sul' ? 0.8 : selected === 'Centro Sul' ? 0.6 : 0.4)) }));
-      dadosConc = dadosConc.map(item => ({ ...item, count: Math.round((item.count ?? 0) * (selected === 'Sul' ? 1.1 : selected === 'Litoral Sul' ? 0.9 : selected === 'Centro Sul' ? 0.7 : 0.5)) }));
-      dadosServico = dadosServico.map(item => ({ ...item, count: Math.round((item.count ?? 0) * (selected === 'Sul' ? 1.3 : selected === 'Litoral Sul' ? 0.7 : selected === 'Centro Sul' ? 0.5 : 0.3)) }));
-      graficoSeccionalRSOrdenado = graficoSeccionalRSOrdenado.filter(item => item.seccional === selected);
-      matrizFiltrada = matrizFiltrada.filter(item => item.seccional === selected);
+      sets.push(new Set([activeFilters.comparison]));
     }
     if (activeFilters.statusENER) {
-      const multiplier = activeFilters.statusENER === 'LIB /ENER' ? 1.5 : activeFilters.statusENER === 'Fora do Prazo' ? 0.8 : 0.3;
-      graficoSeccionalRSOrdenado = graficoSeccionalRSOrdenado.map(item => ({ ...item, totalRS: Math.round((item.totalRS ?? 0) * multiplier), totalPEP: Math.round((item.totalPEP ?? 0) * multiplier) }));
-      dadosConc = dadosConc.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
-      dadosServico = dadosServico.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
-      matrizFiltrada = matrizFiltrada.map(item => ({ ...item, rs: Math.round((item.rs ?? 0) * multiplier) }));
+      const s = new Set(
+        graficoEner.filter(i => i.status === activeFilters.statusENER).map(i => i.seccional)
+      );
+      if (s.size) sets.push(s);
     }
     if (activeFilters.statusCONC) {
-      const multiplier = activeFilters.statusCONC === 'Fora do Prazo' ? 1.2 : 0.6;
-      graficoSeccionalRSOrdenado = graficoSeccionalRSOrdenado.map(item => ({ ...item, totalRS: Math.round((item.totalRS ?? 0) * multiplier), totalPEP: Math.round((item.totalPEP ?? 0) * multiplier) }));
-      dadosEner = dadosEner.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
-      dadosServico = dadosServico.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
-      matrizFiltrada = matrizFiltrada.map(item => ({ ...item, rs: Math.round((item.rs ?? 0) * multiplier) }));
+      const s = new Set(
+        graficoConc.filter(i => i.status === activeFilters.statusCONC).map(i => i.seccional)
+      );
+      if (s.size) sets.push(s);
     }
     if (activeFilters.reasons) {
-      const multiplier = activeFilters.reasons === 'Em Fechamento' ? 1.1 : 0.2;
-      graficoSeccionalRSOrdenado = graficoSeccionalRSOrdenado.map(item => ({ ...item, totalRS: Math.round((item.totalRS ?? 0) * multiplier), totalPEP: Math.round((item.totalPEP ?? 0) * multiplier) }));
-      dadosEner = dadosEner.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
-      dadosConc = dadosConc.map(item => ({ ...item, count: Math.round((item.count ?? 0) * multiplier) }));
-      matrizFiltrada = matrizFiltrada.map(item => ({ ...item, rs: Math.round((item.rs ?? 0) * multiplier) }));
+      const s = new Set(
+        graficoServico.filter(i => i.status === activeFilters.reasons).map(i => i.seccional)
+      );
+      if (s.size) sets.push(s);
     }
+
+    // Interseção dos conjuntos; se não houver, usa todas as seccionais disponíveis
+    let selectedSeccs: Set<string> = new Set(allSeccsSet);
+    if (sets.length) {
+      selectedSeccs = new Set(
+        [...allSeccsSet].filter(s => sets.every(seti => seti.has(s)))
+      );
+    }
+
+    const selectedSeccsArr = [...selectedSeccs];
+
+    // Processa dados agregados por status considerando seccionais selecionadas
+    let dadosEner = processarDados(graficoEner, false, { seccionais: selectedSeccsArr }).slice();
+    let dadosConc = processarDados(graficoConc, true, { seccionais: selectedSeccsArr }).slice();
+    let dadosServico = processarDados(graficoServico, false, { seccionais: selectedSeccsArr }).slice();
+  const graficoSeccionalRSOrdenado = (Array.isArray(graficoSeccionalRS) ? graficoSeccionalRS : [])
+      .filter(item => selectedSeccs.has(item.seccional))
+      .slice()
+      .sort((a, b) => (b.totalRS ?? 0) - (a.totalRS ?? 0));
+  const matrizFiltrada = matriz.filter(item => selectedSeccs.has(item.seccional));
 
     // Ordenação
     dadosEner = dadosEner.sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
     dadosConc = dadosConc.sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
     dadosServico = dadosServico.sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
-    graficoSeccionalRSOrdenado = Array.isArray(graficoSeccionalRSOrdenado)
-      ? graficoSeccionalRSOrdenado.slice().sort((a, b) => (b.totalRS ?? 0) - (a.totalRS ?? 0))
-      : graficoSeccionalRSOrdenado;
 
     return { dadosEner, dadosConc, dadosServico, graficoSeccionalRSOrdenado, matrizFiltrada };
-  }, [graficoEner, graficoConc, graficoServico, graficoSeccionalRS, matriz, seccionaisSelecionadas, activeFilters]);
+  }, [graficoEner, graficoConc, graficoServico, graficoSeccionalRS, matriz, activeFilters]);
 
   const formatarValorRS = (valor) =>
     valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 });
@@ -235,12 +244,12 @@ export default function PrazosSAP() {
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={dadosEner} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fill: '#4a4a4a' }} />
+                    <XAxis dataKey="status" tick={{ fill: '#4a4a4a' }} />
                     <YAxis hide />
                     <Tooltip />
                     <Bar dataKey="count" fill="#3182ce" onClick={data => handleChartClick('statusENER', data)}>
                       {dadosEner.map((entry, idx) => (
-                        <Cell key={idx} fill={activeFilters.statusENER === entry.name ? '#ef4444' : '#3182ce'} />
+                        <Cell key={idx} fill={activeFilters.statusENER === entry.status ? '#ef4444' : '#3182ce'} />
                       ))}
                       <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
                     </Bar>
@@ -252,12 +261,12 @@ export default function PrazosSAP() {
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={dadosConc} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fill: '#4a4a4a' }} />
+                    <XAxis dataKey="status" tick={{ fill: '#4a4a4a' }} />
                     <YAxis hide />
                     <Tooltip />
                     <Bar dataKey="count" fill="#6366f1" onClick={data => handleChartClick('statusCONC', data)}>
                       {dadosConc.map((entry, idx) => (
-                        <Cell key={idx} fill={activeFilters.statusCONC === entry.name ? '#ef4444' : '#6366f1'} />
+                        <Cell key={idx} fill={activeFilters.statusCONC === entry.status ? '#ef4444' : '#6366f1'} />
                       ))}
                       <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
                     </Bar>
@@ -302,12 +311,12 @@ export default function PrazosSAP() {
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={dadosServico} margin={{ top: 20, right: 30, left: 30, bottom: 40 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" tick={{ fill: '#4a4a4a' }} />
+                        <XAxis dataKey="status" tick={{ fill: '#4a4a4a' }} />
                         <YAxis hide />
                         <Tooltip />
                         <Bar dataKey="count" fill="#4ade80" onClick={data => handleChartClick('reasons', data)}>
                           {dadosServico.map((entry, idx) => (
-                            <Cell key={idx} fill={activeFilters.reasons === entry.name ? '#ef4444' : '#4ade80'} />
+                            <Cell key={idx} fill={activeFilters.reasons === entry.status ? '#ef4444' : '#4ade80'} />
                           ))}
                           <LabelList dataKey="count" position="top" fill="#333" fontSize={12} />
                         </Bar>
