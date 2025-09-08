@@ -31,7 +31,6 @@ from rest_framework.response import Response
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-import requests
 import json
 import logging
 import threading
@@ -179,86 +178,7 @@ def auth_verify_email(request):
     return Response({'message': 'Conta verificada com sucesso.'})
 
 
-# Endpoint temporário para testar envio SMTP sem tocar no fluxo de cadastro.
-# Protegido por header X-TEST-EMAIL-SECRET que deve bater com a variável
-# de ambiente TEST_EMAIL_SECRET.
-@csrf_exempt
-@require_POST
-def test_send_email(request):
-    secret = os.environ.get('TEST_EMAIL_SECRET')
-    if not secret:
-        return HttpResponseForbidden('TEST_EMAIL_SECRET not configured')
 
-    header = request.headers.get('X-TEST-EMAIL-SECRET') or request.META.get('HTTP_X_TEST_EMAIL_SECRET')
-    if header != secret:
-        return HttpResponseForbidden('invalid secret')
-
-    try:
-        payload = json.loads(request.body.decode('utf-8') or '{}')
-        frm = payload.get('from') or getattr(settings, 'DEFAULT_FROM_EMAIL', None)
-        to = payload.get('to')
-        subj = payload.get('subject', 'Teste de envio')
-        msg = payload.get('message', 'Mensagem de teste')
-
-        if not frm or not to:
-            return JsonResponse({'ok': False, 'error': 'from and to required'}, status=400)
-
-        # Envia o e-mail (levanta exceção em caso de falha para log completo)
-        send_mail(subj, msg, frm, [to], fail_silently=False)
-        return JsonResponse({'ok': True, 'message': 'Email enviado'})
-    except Exception as e:
-        # Log detalhado para investigação nos logs do Render
-        logging.exception('ERROR sending test email')
-        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
-
-
-# Debug endpoint to confirm environment values read by the running process.
-# Returns EMAIL_HOST_USER, EMAIL_HOST, EMAIL_PORT, EMAIL_USE_TLS and only the
-# length of EMAIL_HOST_PASSWORD so we don't expose secrets. Protected by the
-# same TEST_EMAIL_SECRET header used by test_send_email.
-@csrf_exempt
-def debug_env(request):
-    secret = os.environ.get('TEST_EMAIL_SECRET')
-    if not secret:
-        return HttpResponseForbidden('TEST_EMAIL_SECRET not configured')
-
-    header = request.headers.get('X-TEST-EMAIL-SECRET') or request.META.get('HTTP_X_TEST_EMAIL_SECRET')
-    if header != secret:
-        return HttpResponseForbidden('invalid secret')
-
-    # Read settings/env safely
-    pwd = os.environ.get('EMAIL_HOST_PASSWORD', '')
-    data = {
-        'email_host_user': os.environ.get('EMAIL_HOST_USER') or getattr(settings, 'EMAIL_HOST_USER', None),
-        'email_host': os.environ.get('EMAIL_HOST') or getattr(settings, 'EMAIL_HOST', None),
-        'email_port': os.environ.get('EMAIL_PORT') or getattr(settings, 'EMAIL_PORT', None),
-        'email_use_tls': os.environ.get('EMAIL_USE_TLS') or getattr(settings, 'EMAIL_USE_TLS', None),
-        'email_password_length': len(pwd),
-        'deploy_info': os.environ.get('RENDER_SERVICE_ID') or os.environ.get('RENDER_DEPLOY_ID') or None,
-    }
-    return JsonResponse({'ok': True, 'env': data})
-
-
-# Endpoint para descobrir o IP público de saída (egress) da instância.
-# Usa ipify e é protegido pelo mesmo TEST_EMAIL_SECRET.
-@csrf_exempt
-def egress_ip(request):
-    secret = os.environ.get('TEST_EMAIL_SECRET')
-    if not secret:
-        return HttpResponseForbidden('TEST_EMAIL_SECRET not configured')
-
-    header = request.headers.get('X-TEST-EMAIL-SECRET') or request.META.get('HTTP_X_TEST_EMAIL_SECRET')
-    if header != secret:
-        return HttpResponseForbidden('invalid secret')
-
-    try:
-        resp = requests.get('https://api.ipify.org', timeout=10)
-        resp.raise_for_status()
-        ip = (resp.text or '').strip()
-        return JsonResponse({'ok': True, 'ip': ip})
-    except Exception as e:
-        logging.exception('ERROR fetching egress IP')
-        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
 
 @api_view(['GET'])
