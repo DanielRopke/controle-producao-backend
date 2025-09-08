@@ -232,10 +232,38 @@ export default function PrazosSAP() {
 		// 1) Base de linhas para OUTROS gráficos e TABELA: respeita comparação e região
 		const regionFilterForOthers = (activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : undefined)) as string | undefined;
 		let rowsForOthers = rawRows;
-		if (regionFilterForOthers) rowsForOthers = rowsForOthers.filter(r => (r.seccional || '').trim() === regionFilterForOthers);
-		if (activeFilters.statusENER && anyHasEner) rowsForOthers = rowsForOthers.filter(r => (r.statusEner || '').trim() === activeFilters.statusENER);
-		if (activeFilters.statusCONC && anyHasConc) rowsForOthers = rowsForOthers.filter(r => (r.statusConc || '').trim() === activeFilters.statusCONC);
-		if (activeFilters.reasons && anyHasMotivos) rowsForOthers = rowsForOthers.filter(r => (r.statusServico || '').trim() === activeFilters.reasons);
+				if (regionFilterForOthers) rowsForOthers = rowsForOthers.filter(r => (r.seccional || '').trim() === regionFilterForOthers);
+
+				// Filtragem por status ENER / CONC / Motivos.
+				// Se a matriz (rawRows) possui os campos auxiliares, filtramos diretamente por eles.
+				// Caso contrário, usamos os mapas agregados (statusEnerMap/statusConcMap/reasonsMap)
+				// para derivar as seccionais válidas para o rótulo selecionado.
+				if (activeFilters.statusENER) {
+					if (anyHasEner) {
+						rowsForOthers = rowsForOthers.filter(r => (r.statusEner || '').trim() === activeFilters.statusENER);
+					} else if (statusEnerMap && statusEnerMap[activeFilters.statusENER]) {
+						const allowed = new Set(Object.keys(statusEnerMap[activeFilters.statusENER] || {}));
+						rowsForOthers = rowsForOthers.filter(r => allowed.has((r.seccional || '').trim()));
+					}
+				}
+
+				if (activeFilters.statusCONC) {
+					if (anyHasConc) {
+						rowsForOthers = rowsForOthers.filter(r => (r.statusConc || '').trim() === activeFilters.statusCONC);
+					} else if (statusConcMap && statusConcMap[activeFilters.statusCONC]) {
+						const allowed = new Set(Object.keys(statusConcMap[activeFilters.statusCONC] || {}));
+						rowsForOthers = rowsForOthers.filter(r => allowed.has((r.seccional || '').trim()));
+					}
+				}
+
+				if (activeFilters.reasons) {
+					if (anyHasMotivos) {
+						rowsForOthers = rowsForOthers.filter(r => (r.statusServico || '').trim() === activeFilters.reasons);
+					} else if (reasonsMap && reasonsMap[activeFilters.reasons]) {
+						const allowed = new Set(Object.keys(reasonsMap[activeFilters.reasons] || {}));
+						rowsForOthers = rowsForOthers.filter(r => allowed.has((r.seccional || '').trim()));
+					}
+				}
 		if (pepSearch.trim()) rowsForOthers = rowsForOthers.filter(r => (r.pep || '').toLowerCase().includes(pepSearch.toLowerCase()));
 
 		// 2) Base de linhas para COMPARATIVO: NÃO aplicar filtro de comparação nem selectedRegion, apenas demais filtros

@@ -1,4 +1,4 @@
-import type { MatrizItem } from '../types'
+import type { MatrizItem } from '../services/api'
 
 /**
  * Componente de tabela para exibir matriz de prazos SAP.

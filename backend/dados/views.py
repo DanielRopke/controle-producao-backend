@@ -606,7 +606,11 @@ def matriz_dados(request):
                 'statusSap': row.get('STATUS SAP', ''),
                 'valor': valor,
                 'seccional': seccional,
-                'tipo': tipo
+                'tipo': tipo,
+                # Campos auxiliares usados pelo frontend para filtragem/cross-filter
+                'statusEner': (row.get('Status ENER') or row.get('STATUS ENER') or row.get('status ener') or '').strip(),
+                'statusConc': (row.get('Status CONC') or row.get('STATUS CONC') or row.get('status conc') or '').strip(),
+                'statusServico': (row.get('status serviço') or row.get('STATUS SERVIÇO') or row.get('Status Serviço') or row.get('status servico') or '').strip(),
             })
 
         return Response(dados_filtrados)

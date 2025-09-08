@@ -77,6 +77,27 @@ axios.interceptors.request.use((config) => {
   return config
 })
 
+// Interceptor de respostas: trata 401 globalmente (sessão expirada)
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status
+    if (status === 401) {
+      try {
+        localStorage.removeItem('jwt_access')
+        localStorage.removeItem('jwt_refresh')
+  } catch { /* ignore storage errors */ }
+      // Redireciona para login com flag de sessão expirada
+      if (typeof window !== 'undefined') {
+        const current = window.location.pathname + window.location.search
+        const qp = new URLSearchParams({ expired: '1', next: current })
+        window.location.assign(`/login?${qp.toString()}`)
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 async function get<T>(path: string, params?: Record<string,string>): Promise<T> {
   const res = await axios.get<T>(`${API_BASE}${path}`, { params })
   return res.data

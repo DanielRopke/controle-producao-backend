@@ -25,7 +25,7 @@ export type MatrizItem = {
   prazo: string;
   dataConclusao: string;
   statusSap: string;
-  valor: string;
+  valor: string | number;
   seccional: string;
   tipo: string;
 };
