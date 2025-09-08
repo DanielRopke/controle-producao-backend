@@ -64,6 +64,9 @@ from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db.models import Q
+from django.utils import timezone
+from datetime import timedelta
+from .models import EmailVerificationStatus
 
 User = get_user_model()
 
@@ -79,7 +82,13 @@ def exemplo(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def auth_register(request):
-    """Registra ou reenvia verificação se usuário já existir e estiver inativo."""
+    """Cadastro e fluxo de envio de confirmação com regras de mensagens:
+    - Se já existe usuário ATIVO com o e-mail: "Email já Cadastrado a um Usuário" (400)
+    - Se não existe usuário: cria e envia => "Email de Confirmação Enviado" (201)
+    - Se existe usuário INATIVO:
+        - se último envio < 2 minutos: "Email de Confirmação Já Enviado" (200)
+        - caso contrário: reenvia e retorna "Email de Confirmação Reenviado" (200)
+    """
     data = request.data or {}
     username = (data.get('username') or '').strip()
     email = (data.get('email') or '').strip().lower()
@@ -94,67 +103,57 @@ def auth_register(request):
     if not matricula:
         return Response({'matricula': 'Informe a matrícula.'}, status=400)
 
-    # Se já existe usuário por e-mail ou username
-    existing = User.objects.filter(Q(email__iexact=email) | Q(username=username)).first()
-    if existing:
-        if existing.is_active:
-            return Response({'detail': 'Usuário já ativo. Faça login.'}, status=400)
-        # Atualiza dados e reenvia e-mail de verificação
-        if username and existing.username != username:
-            existing.username = username
-        existing.first_name = matricula
-        existing.set_password(password)
-        existing.save(update_fields=['username', 'first_name', 'password'])
+    # Verificar se já existe usuário para o e-mail
+    try:
+        existing = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        existing = None
 
-        uid = urlsafe_base64_encode(force_bytes(existing.pk))
-        token = default_token_generator.make_token(existing)
+    # Se já existe usuário ATIVO => bloquear
+    if existing and existing.is_active:
+        return Response({'email': 'Email já Cadastrado a um Usuário'}, status=400)
+
+    # Função auxiliar para enviar email de verificação
+    def send_verification_email(u):
+        uid = urlsafe_base64_encode(force_bytes(u.pk))
+        token = default_token_generator.make_token(u)
         frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
         verify_link = f"{frontend_base}/cadastro?uid={uid}&token={token}"
         subject = "Verifique seu cadastro"
         body = (
             "Olá,\n\n"
-            "Você solicitou novamente a ativação da sua conta. Confirme pelo link abaixo:\n"
+            "Recebemos seu cadastro. Para ativar sua conta, confirme pelo link abaixo:\n"
             f"{verify_link}\n\n"
             "Se não foi você, ignore esta mensagem."
         )
         try:
-            send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [existing.email], fail_silently=False)
+            send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [u.email], fail_silently=False)
         except Exception as e:
-            # Log detalhado para depuração em produção
-            print('ERROR sending verification email (resend):', repr(e))
-            print('Verification link (resend):', verify_link)
-        resp = {'message': 'Reenviamos o e-mail de verificação.'}
-        if getattr(settings, 'DEBUG', False):
-            resp['debug_verify_link'] = verify_link
-        return Response(resp)
+            print('ERROR sending verification email:', repr(e))
+            print('Verification link:', verify_link)
+        # Atualizar/registrar last_sent_at
+        evs, _ = EmailVerificationStatus.objects.get_or_create(user=u)
+        evs.last_sent_at = timezone.now()
+        evs.save(update_fields=['last_sent_at'])
+        return verify_link
 
-    # Fluxo normal de criação
+    # Se existe usuário INATIVO => aplicar janela de 2 minutos
+    if existing and not existing.is_active:
+        evs, _ = EmailVerificationStatus.objects.get_or_create(user=existing)
+        now = timezone.now()
+        if evs.last_sent_at and now - evs.last_sent_at < timedelta(minutes=2):
+            # Dentro da janela de 2 minutos
+            return Response({'message': 'Email de Confirmação Já Enviado'}, status=200)
+        # Fora da janela, reenviar
+        send_verification_email(existing)
+        return Response({'message': 'Email de Confirmação Reenviado'}, status=200)
+
+    # Não existe usuário ainda: criar e enviar
     ser = RegisterSerializer(data=data)
     ser.is_valid(raise_exception=True)
     user = ser.save()
-
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
-    token = default_token_generator.make_token(user)
-    frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
-    verify_link = f"{frontend_base}/cadastro?uid={uid}&token={token}"
-
-    subject = "Verifique seu cadastro"
-    body = (
-        "Olá,\n\n"
-        "Recebemos seu cadastro. Para ativar sua conta, confirme pelo link abaixo:\n"
-        f"{verify_link}\n\n"
-        "Se não foi você, ignore esta mensagem."
-    )
-    try:
-        send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
-    except Exception as e:
-        # Fallback: logar detalhes no console do servidor
-        print('ERROR sending verification email (register):', repr(e))
-        print('Verification link (register):', verify_link)
-
-    resp = {'message': 'Cadastro recebido. Verifique seu e-mail para ativar a conta.'}
-    if getattr(settings, 'DEBUG', False):
-        resp['debug_verify_link'] = verify_link
+    send_verification_email(user)
+    resp = {'message': 'Email de Confirmação Enviado'}
     return Response(resp, status=201)
 
 
