@@ -5,7 +5,7 @@ from django.conf import settings
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('dados', '0001_initial'),
+        ('dados', '0002_delete_matrizrow'),
     ]
 
     operations = [
