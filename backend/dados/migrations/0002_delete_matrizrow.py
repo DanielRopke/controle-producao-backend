@@ -9,8 +9,7 @@ class Migration(migrations.Migration):
         ('dados', '0001_initial'),
     ]
 
-    operations = [
-        migrations.DeleteModel(
-            name='MatrizRow',
-        ),
-    ]
+    # Esta migration foi convertida em no-op para evitar inconsistência de estado
+    # durante a reconstrução (KeyError ao remover modelo ausente). O modelo
+    # MatrizRow não é mais utilizado.
+    operations = []
