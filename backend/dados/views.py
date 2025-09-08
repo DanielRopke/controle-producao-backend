@@ -111,7 +111,7 @@ def auth_register(request):
 
     # Se já existe usuário ATIVO => bloquear
     if existing and existing.is_active:
-        return Response({'email': 'Email já Cadastrado a um Usuário'}, status=400)
+        return Response({'email': 'Email já Cadastrado a um Usuário', 'message': 'Email já Cadastrado a um Usuário'}, status=400)
 
     # Função auxiliar para enviar email de verificação
     def send_verification_email(u):
