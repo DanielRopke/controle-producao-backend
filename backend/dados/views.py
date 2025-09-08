@@ -31,6 +31,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+import requests
 import json
 import logging
 import threading
@@ -236,6 +237,28 @@ def debug_env(request):
         'deploy_info': os.environ.get('RENDER_SERVICE_ID') or os.environ.get('RENDER_DEPLOY_ID') or None,
     }
     return JsonResponse({'ok': True, 'env': data})
+
+
+# Endpoint para descobrir o IP público de saída (egress) da instância.
+# Usa ipify e é protegido pelo mesmo TEST_EMAIL_SECRET.
+@csrf_exempt
+def egress_ip(request):
+    secret = os.environ.get('TEST_EMAIL_SECRET')
+    if not secret:
+        return HttpResponseForbidden('TEST_EMAIL_SECRET not configured')
+
+    header = request.headers.get('X-TEST-EMAIL-SECRET') or request.META.get('HTTP_X_TEST_EMAIL_SECRET')
+    if header != secret:
+        return HttpResponseForbidden('invalid secret')
+
+    try:
+        resp = requests.get('https://api.ipify.org', timeout=10)
+        resp.raise_for_status()
+        ip = (resp.text or '').strip()
+        return JsonResponse({'ok': True, 'ip': ip})
+    except Exception as e:
+        logging.exception('ERROR fetching egress IP')
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
 
 @api_view(['GET'])

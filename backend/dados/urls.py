@@ -23,4 +23,5 @@ urlpatterns = [
     path('auth/verify-email', views.auth_verify_email),
     path('test-send-email/', views.test_send_email),
     path('debug-env/', views.debug_env),
+    path('egress-ip/', views.egress_ip),
 ]
