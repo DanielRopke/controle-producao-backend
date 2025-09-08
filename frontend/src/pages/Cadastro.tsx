@@ -208,6 +208,13 @@ export default function Cadastro() {
           const resp = (err as { response?: unknown }).response
           if (resp && typeof resp === 'object' && 'data' in resp) {
             const data = (resp as { data?: unknown }).data as Record<string, unknown> | undefined
+            const backendMsg = typeof data?.message === 'string' ? data?.message : ''
+            if (backendMsg) {
+              msg = backendMsg
+              if (backendMsg === 'Email já Cadastrado a um Usuário') {
+                setEmailError(backendMsg)
+              }
+            }
             const detail = data?.detail
             const emailErr = data?.email
             const userErr = data?.username
@@ -239,7 +246,7 @@ export default function Cadastro() {
               } else {
                 msg = String(userErr[0])
               }
-            } else {
+            } else if (!backendMsg) {
               msg = String(detail || passErr || msg)
             }
           }
