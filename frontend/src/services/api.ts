@@ -63,7 +63,7 @@ function buildParams(f: BaseFilters | ExtendedFilters): Record<string,string> {
 axios.interceptors.request.use((config) => {
   const url = (config.url || '').toString()
   // Não anexar Authorization para endpoints públicos de auth
-  const isPublicAuth = /\/token\/?$|\/token\/refresh\/?$|\/auth\/(register|verify-email)\/?$/.test(url)
+  const isPublicAuth = /\/token\/?$|\/token\/refresh\/?$|\/auth\/(register|verify-email|resend-confirmation)\/?$/.test(url)
   if (!isPublicAuth) {
     const token = localStorage.getItem('jwt_access')
     if (token) {
@@ -101,6 +101,10 @@ export const api = {
   verifyEmail: async (uid: string, token: string) => {
     const res = await axios.post(`${API_BASE}/auth/verify-email`, { uid, token })
     return res.data as { message: string }
+  },
+  resendConfirmation: async (email: string, timer_running?: boolean) => {
+    const res = await axios.post(`${API_BASE}/auth/resend-confirmation`, { email, timer_running })
+    return res.data as { message: string; debug_verify_link?: string }
   }
 }
 

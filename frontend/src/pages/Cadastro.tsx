@@ -168,27 +168,37 @@ export default function Cadastro() {
       return
     }
 
-    // Bloqueia reenvio dentro de 2 minutos
-    if (firstSentAt) {
-      const elapsed = Date.now() - firstSentAt
-      if (elapsed < COOLDOWN_MS) {
-        toast.message('Confirmação de Email já Enviado')
-        return
-      }
-    }
     ;(async () => {
       try {
         const isResend = !!firstSentAt
-        const resp = await api.register({
-          username: username.trim() || emailTrim.split('@')[0],
-          email: emailTrim,
-          matricula: matricula.trim(),
-          password: password,
-        })
-        // Marca o horário do envio para controle do cooldown
-        saveFirstSentNow(emailTrim)
+        let resp: { message?: string; debug_verify_link?: string } | undefined
+        if (isResend) {
+          // Se estamos no fluxo de reenvio, delegar a mensagem ao backend com flag do timer
+          const elapsed = Date.now() - (firstSentAt || 0)
+          const timerRunning = elapsed < COOLDOWN_MS
+          resp = await api.resendConfirmation(emailTrim, timerRunning)
+          // Se o timer já expirou, reinicia o relógio local
+          if (!timerRunning) {
+            saveFirstSentNow(emailTrim)
+          }
+        } else {
+          resp = await api.register({
+            username: username.trim() || emailTrim.split('@')[0],
+            email: emailTrim,
+            matricula: matricula.trim(),
+            password: password,
+          })
+          // Primeiro envio: iniciar timer
+          saveFirstSentNow(emailTrim)
+        }
         setEmailError(null)
-        toast.success(isResend ? 'Email de Confirmação Reenviado.' : 'Cadastro recebido! Verifique seu e-mail para confirmar.')
+        // Mensagens padronizadas conforme backend
+        const backendMsg = resp?.message || ''
+        if (backendMsg) {
+          toast.success(backendMsg)
+        } else {
+          toast.success(isResend ? 'Email de Confirmação Reenviado' : 'Email de Confirmação Enviado')
+        }
         if (resp?.debug_verify_link) {
           toast.message('Link de verificação (dev): ' + resp.debug_verify_link)
         }
@@ -207,25 +217,25 @@ export default function Cadastro() {
             // normalizar acentos e comparar
             const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
             if (detailStr && norm(detailStr).includes('usuario ja ativo')) {
-              msg = 'Email já Cadastrado'
-              setEmailError('Email já Cadastrado')
+              msg = 'Email já Cadastrado a um Usuário'
+              setEmailError('Email já Cadastrado a um Usuário')
             } else if (typeof emailErr === 'string' || Array.isArray(emailErr)) {
               // Qualquer erro de email duplicado vira mensagem padronizada
-              msg = 'Email já Cadastrado'
-              setEmailError('Email já Cadastrado')
+              msg = 'Email já Cadastrado a um Usuário'
+              setEmailError('Email já Cadastrado a um Usuário')
             } else if (typeof userErr === 'string') {
               const u = norm(userErr)
               if (u.includes('ja existe') || u.includes('already exists')) {
-                msg = 'Email já Cadastrado'
-                setEmailError('Email já Cadastrado')
+                msg = 'Email já Cadastrado a um Usuário'
+                setEmailError('Email já Cadastrado a um Usuário')
               } else {
                 msg = String(userErr)
               }
             } else if (Array.isArray(userErr) && userErr.length > 0) {
               const u0 = norm(String(userErr[0]))
               if (u0.includes('ja existe') || u0.includes('already exists')) {
-                msg = 'Email já Cadastrado'
-                setEmailError('Email já Cadastrado')
+                msg = 'Email já Cadastrado a um Usuário'
+                setEmailError('Email já Cadastrado a um Usuário')
               } else {
                 msg = String(userErr[0])
               }
