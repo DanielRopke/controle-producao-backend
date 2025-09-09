@@ -11,6 +11,44 @@ import type { MatrizItem } from '../services/api';
  * @returns Dados dos gráficos, listas de filtros e matriz
  */
 
+function cleanLabel(value: unknown): string {
+  const s = String(value ?? '')
+    .replace(/\r?\n/g, ' ')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s;
+}
+
+function flattenGrafico(data: Record<string, Record<string, number>>): GraficoItem[] {
+  return Object.entries(data)
+    .flatMap(([status, obj]) => {
+      const sClean = cleanLabel(status);
+      return Object.entries(obj).map(([seccional, count]) => ({
+        status: sClean,
+        seccional: cleanLabel(seccional),
+        count: Number(count) || 0,
+      }));
+    })
+    .filter((item) => !!item.status);
+}
+
+function flattenSeccionalRS(
+  data: Record<string, { valor: number; pep_count: number; mes?: string; tipo?: string; statusSap?: string }>,
+): SeccionalData[] {
+  return Object.entries(data)
+    .filter(([seccional]) => seccional !== '#N/A')
+    .map(([seccional, valores]) => ({
+      seccional,
+      totalRS: Number((valores?.valor ?? 0).toFixed(0)),
+      totalPEP: valores?.pep_count ?? 0,
+      scaledPEP: (valores?.pep_count ?? 0) * 10000,
+      mes: valores?.mes ?? '',
+      tipo: valores?.tipo ?? '',
+      statusSap: valores?.statusSap ?? '',
+    }));
+}
+
 export function useDadosGraficos(filtros: {
   /** Seccionais selecionadas */
   seccionais: string[];
@@ -61,26 +99,6 @@ export function useDadosGraficos(filtros: {
     if (filtros.mes) params.mes = filtros.mes;
     api.getMatrizDados(params).then(setMatriz).catch(() => setMatriz([]));
   }, [filtros]);
-
-  function flattenGrafico(data: Record<string, Record<string, number>>): GraficoItem[] {
-    return Object.entries(data).flatMap(([status, obj]) =>
-      Object.entries(obj).map(([seccional, count]) => ({ status, seccional, count: Number(count) || 0 }))
-    );
-  }
-  // Suporta tanto o formato antigo quanto o novo (agrupado por seccional)
-  function flattenSeccionalRS(data: Record<string, { valor: number; pep_count: number; mes?: string; tipo?: string; statusSap?: string }>): SeccionalData[] {
-    return Object.entries(data)
-      .filter(([seccional]) => seccional !== '#N/A')
-      .map(([seccional, valores]) => ({
-        seccional,
-        totalRS: Number((valores?.valor ?? 0).toFixed(0)),
-        totalPEP: valores?.pep_count ?? 0,
-        scaledPEP: (valores?.pep_count ?? 0) * 10000,
-        mes: valores?.mes ?? '',
-        tipo: valores?.tipo ?? '',
-        statusSap: valores?.statusSap ?? '',
-      }));
-  }
 
   return {
     seccionais,

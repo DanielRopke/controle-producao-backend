@@ -4,6 +4,28 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from .google_sheets import get_sheet, get_gspread_client
 import os
 from django.conf import settings
+
+# Utilitário para normalizar rótulos vindos da planilha (remove quebras de linha, espaços invisíveis e colapsa espaços)
+def _clean_label(value):
+    try:
+        s = str(value) if value is not None else ""
+    except Exception:
+        s = ""
+    if not s:
+        return ""
+    # remove quebras de linha internas e substitui por espaço
+    s = s.replace("\r", " ").replace("\n", " ")
+    # remove caracteres de largura zero
+    s = (
+        s.replace("\u200b", "")
+         .replace("\u200c", "")
+         .replace("\u200d", "")
+         .replace("\ufeff", "")
+    )
+    # colapsa espaços
+    import re
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
 # Permissão padrão para endpoints GET: pública por padrão (PUBLIC_READ=true) ou em DEV
 # Ajuste PUBLIC_READ para 'false' no ambiente caso seja necessário exigir JWT em produção.
 DEFAULT_GET_PERMISSION = AllowAny if (getattr(settings, 'DEBUG', False) or os.getenv('PUBLIC_READ', 'true').lower() == 'true') else IsAuthenticated
@@ -427,9 +449,9 @@ def status_ener_pep(request):
         ignorar = {"em andamento", "fechada"}
         contagem = {}
         for row in data:
-            status = (row.get('Status ENER') or row.get('STATUS ENER') or "").strip()
+            status = _clean_label(row.get('Status ENER') or row.get('STATUS ENER') or "")
             pep = row.get('PEP')
-            seccional = (row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or "").strip()
+            seccional = _clean_label(row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or "")
             if not status or not pep or not seccional:
                 continue
             if status.lower() in ignorar:
@@ -451,9 +473,9 @@ def status_conc_pep(request):
         ignorar = {"em andamento", "fechada"}
         contagem = {}
         for row in data:
-            status = (row.get('Status CONC') or row.get('STATUS CONC') or "").strip()
+            status = _clean_label(row.get('Status CONC') or row.get('STATUS CONC') or "")
             pep = row.get('PEP')
-            seccional = (row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or "").strip()
+            seccional = _clean_label(row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or "")
             if not status or not pep or not seccional:
                 continue
             if status.lower() in ignorar:
@@ -479,11 +501,11 @@ def status_servico_contagem(request):
         data = get_sheet_cached('Prazos SAP')
         contagem = {}
         for row in data:
-            status = row.get('status serviço') or row.get('STATUS SERVIÇO') or row.get('Status Serviço')
-            seccional = (row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or '').strip()
-            status_sap = (row.get('STATUS SAP') or '').strip()
-            tipo = (row.get('TIPO') or '').strip()
-            data_conclusao = (row.get('DATA CONCLUSÃO') or '').strip()
+            status = _clean_label(row.get('status serviço') or row.get('STATUS SERVIÇO') or row.get('Status Serviço') or row.get('status servico'))
+            seccional = _clean_label(row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or '')
+            status_sap = _clean_label(row.get('STATUS SAP') or '')
+            tipo = _clean_label(row.get('TIPO') or '')
+            data_conclusao = _clean_label(row.get('DATA CONCLUSÃO') or '')
             # Filtros
             if seccionais and seccional not in seccionais:
                 continue
@@ -500,9 +522,6 @@ def status_servico_contagem(request):
                 except:
                     continue
             if not status or not seccional:
-                continue
-            status = status.strip()
-            if not status:
                 continue
             if status not in contagem:
                 contagem[status] = {}
@@ -583,10 +602,10 @@ def matriz_dados(request):
         dados_filtrados = []
 
         for row in dados:
-            seccional = (row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or '').strip()
-            status_sap = (row.get('STATUS SAP') or '').strip()
-            tipo = (row.get('TIPO') or '').strip()
-            data_conclusao = (row.get('DATA CONCLUSÃO') or '').strip()
+            seccional = _clean_label(row.get('SECCIONAL') or row.get('SECCIONAL\nOBRA') or '')
+            status_sap = _clean_label(row.get('STATUS SAP') or '')
+            tipo = _clean_label(row.get('TIPO') or '')
+            data_conclusao = _clean_label(row.get('DATA CONCLUSÃO') or '')
 
             if seccionais and seccional not in seccionais:
                 continue
@@ -626,16 +645,16 @@ def matriz_dados(request):
 
             dados_filtrados.append({
                 'pep': pep,
-                'prazo': row.get('PRAZO', ''),
+                'prazo': _clean_label(row.get('PRAZO') or ''),
                 'dataConclusao': data_conclusao,
-                'statusSap': row.get('STATUS SAP', ''),
+                'statusSap': status_sap,
                 'valor': valor,
                 'seccional': seccional,
                 'tipo': tipo,
                 # Campos auxiliares usados pelo frontend para filtragem/cross-filter
-                'statusEner': (row.get('Status ENER') or row.get('STATUS ENER') or row.get('status ener') or '').strip(),
-                'statusConc': (row.get('Status CONC') or row.get('STATUS CONC') or row.get('status conc') or '').strip(),
-                'statusServico': (row.get('status serviço') or row.get('STATUS SERVIÇO') or row.get('Status Serviço') or row.get('status servico') or '').strip(),
+                'statusEner': _clean_label(row.get('Status ENER') or row.get('STATUS ENER') or row.get('status ener') or ''),
+                'statusConc': _clean_label(row.get('Status CONC') or row.get('STATUS CONC') or row.get('status conc') or ''),
+                'statusServico': _clean_label(row.get('status serviço') or row.get('STATUS SERVIÇO') or row.get('Status Serviço') or row.get('status servico') or ''),
             })
 
         return Response(dados_filtrados)

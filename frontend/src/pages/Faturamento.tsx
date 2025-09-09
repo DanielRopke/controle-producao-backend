@@ -286,7 +286,8 @@ export default function Faturamento() {
     const statusSet = new Set<string>(); const mesCicloSet = new Set<string>(); const anoSet = new Set<string>(); const motivoSet = new Set<string>();
     for (const r of rawRows) {
       const s = (r.statusSap || '').toString().trim(); const mes = (r.tipo || '').toString().trim(); const ano = String((r as unknown as Record<string, unknown>).anoCiclo ?? '').trim();
-      const motivo = String((r as unknown as Record<string, unknown>)['Motivo Prioridade'] ?? (r as any).motivoPrioridade ?? '').trim();
+      const rAny = r as unknown as Record<string, unknown>;
+      const motivo = String(rAny['Motivo Prioridade'] ?? rAny['motivoPrioridade'] ?? '').trim();
       if (s && !invalid.has(s)) statusSet.add(s);
       if (mes && !invalid.has(mes)) { const n = parseInt(String(mes), 10); if (!Number.isNaN(n) && n >= 1 && n <= 12) mesCicloSet.add(String(n)); else mesCicloSet.add(mes); }
       if (ano && !invalid.has(ano)) anoSet.add(ano);
@@ -359,15 +360,19 @@ export default function Faturamento() {
       });
       setRawRows(mapped as unknown as MatrizItem[]);
       showToast(`Previsão de Faturamento carregada: ${mapped.length} linhas`);
-      // Tentativa de diagnosticar se o backend tem acesso às credenciais do Google Sheets no deploy
+      // Diagnóstico: só alerta se não houver NENHUMA forma de credencial/ID (nem env, nem arquivos locais)
       try {
         const statusRes = await axios.get('/api/sheets-status/');
         if (statusRes && statusRes.data) {
           const s = statusRes.data;
           console.info('sheets-status:', s);
-          // apenas notificamos de problemas óbvios (faltando variáveis/arquivos)
-          if (!s.env_GOOGLE_SHEETS_CREDENTIALS_JSON_BASE64 || !s.env_GOOGLE_SHEETS_SPREADSHEET_ID) {
-            showToast('Aviso: backend sem variáveis de Google Sheets configuradas (ver console).');
+          const hasSomeCred = Boolean(s.env_GOOGLE_SHEETS_CREDENTIALS_JSON_BASE64) || Boolean(s.local_cred_base64_txt_exists) || Boolean(s.local_cred_json_exists);
+          const hasSpreadsheetId = Boolean(s.env_GOOGLE_SHEETS_SPREADSHEET_ID);
+          if (!hasSomeCred || !hasSpreadsheetId) {
+            // Só alerta quando faltar ambos (credencial e ID), indicando provável falha real
+            if (!hasSomeCred && !hasSpreadsheetId) {
+              showToast('Aviso: backend sem credenciais/ID do Google Sheets (ver console).');
+            }
           }
         }
       } catch (stErr) {
