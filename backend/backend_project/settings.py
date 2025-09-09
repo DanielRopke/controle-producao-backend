@@ -17,14 +17,31 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'troque-essa-chave-para-producao')
 # Debug baseado em variável de ambiente
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
-# Domínios permitidos (env > default)
-# Inclui wildcard para qualquer subdomínio do Render por segurança operacional
-ALLOWED_HOSTS = [
-    h.strip() for h in os.getenv(
-        'ALLOWED_HOSTS',
-        '.onrender.com,controle-producao-backend.onrender.com,localhost,127.0.0.1,controlesetup.com.br,www.controlesetup.com.br'
-    ).split(',') if h.strip()
+# Domínios permitidos (env + extras obrigatórios)
+_env_hosts = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h.strip()]
+_extra_hosts = [
+    '.onrender.com',
+    'controle-producao-backend.onrender.com',
+    'localhost',
+    '127.0.0.1',
+    'controlesetup.com.br',
+    'www.controlesetup.com.br',
 ]
+# Se a plataforma expuser hostname/URL, incluir também
+_render_ext_host = os.getenv('RENDER_EXTERNAL_HOSTNAME') or ''
+_render_ext_url = os.getenv('RENDER_EXTERNAL_URL') or ''
+if _render_ext_host:
+    _extra_hosts.append(_render_ext_host)
+if _render_ext_url:
+    try:
+        from urllib.parse import urlparse
+        _h = urlparse(_render_ext_url).hostname
+        if _h:
+            _extra_hosts.append(_h)
+    except Exception:
+        pass
+
+ALLOWED_HOSTS = sorted(set([h for h in (_env_hosts + _extra_hosts) if h]))
 
 # Aplicativos instalados
 INSTALLED_APPS = [
