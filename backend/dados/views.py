@@ -4,8 +4,9 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from .google_sheets import get_sheet, get_gspread_client
 import os
 from django.conf import settings
-# Permissão padrão para endpoints GET: pública em DEV ou quando PUBLIC_READ=true
-DEFAULT_GET_PERMISSION = AllowAny if (getattr(settings, 'DEBUG', False) or os.getenv('PUBLIC_READ', '').lower() == 'true') else IsAuthenticated
+# Permissão padrão para endpoints GET: pública por padrão (PUBLIC_READ=true) ou em DEV
+# Ajuste PUBLIC_READ para 'false' no ambiente caso seja necessário exigir JWT em produção.
+DEFAULT_GET_PERMISSION = AllowAny if (getattr(settings, 'DEBUG', False) or os.getenv('PUBLIC_READ', 'true').lower() == 'true') else IsAuthenticated
 
 @api_view(['GET'])
 @permission_classes([DEFAULT_GET_PERMISSION])
