@@ -117,7 +117,7 @@ export const api = {
   // Auth
   register: async (payload: RegisterPayload) => {
     const res = await axios.post(`${API_BASE}/auth/register`, payload)
-    return res.data as { message: string; debug_verify_link?: string }
+    return res.data as { message: string }
   },
   verifyEmail: async (uid: string, token: string) => {
     const res = await axios.post(`${API_BASE}/auth/verify-email`, { uid, token })
@@ -125,7 +125,7 @@ export const api = {
   },
   resendConfirmation: async (email: string, timer_running?: boolean) => {
     const res = await axios.post(`${API_BASE}/auth/resend-confirmation`, { email, timer_running })
-    return res.data as { message: string; debug_verify_link?: string }
+    return res.data as { message: string }
   }
 }
 

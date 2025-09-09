@@ -58,8 +58,8 @@ export default function Cadastro() {
     if (!uid || !token) return
     ;(async () => {
       try {
-        await api.verifyEmail(uid, token)
-        toast.success('Conta verificada. Faça login.')
+        const resp = await api.verifyEmail(uid, token)
+        toast.success(resp?.message || 'Usuário Registrado com Sucesso')
         navigate('/login', { replace: true })
       } catch {
         toast.error('Link de verificação inválido ou expirado.')
@@ -168,10 +168,10 @@ export default function Cadastro() {
       return
     }
 
-    ;(async () => {
+  ;(async () => {
       try {
         const isResend = !!firstSentAt
-        let resp: { message?: string; debug_verify_link?: string } | undefined
+    let resp: { message?: string } | undefined
         if (isResend) {
           // Se estamos no fluxo de reenvio, delegar a mensagem ao backend com flag do timer
           const elapsed = Date.now() - (firstSentAt || 0)
@@ -199,9 +199,7 @@ export default function Cadastro() {
         } else {
           toast.success(isResend ? 'Email de Confirmação Reenviado' : 'Email de Confirmação Enviado')
         }
-        if (resp?.debug_verify_link) {
-          toast.message('Link de verificação (dev): ' + resp.debug_verify_link)
-        }
+    // não exibir links de debug vindos do backend; confiar apenas em `message`
       } catch (err: unknown) {
         let msg = 'Falha ao cadastrar'
         if (typeof err === 'object' && err && 'response' in err) {

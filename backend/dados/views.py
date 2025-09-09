@@ -207,10 +207,7 @@ def auth_register(request):
 
         # Mensagem depende apenas do estado do timer no frontend
         msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
-        resp = {'message': msg}
-        if getattr(settings, 'DEBUG', False):
-            resp['debug_verify_link'] = verify_link
-        return Response(resp, status=200)
+            return Response({'message': msg}, status=200)
 
     # Caso 3: não existe -> criar e enviar
     ser = RegisterSerializer(data=data)
@@ -235,10 +232,7 @@ def auth_register(request):
         print('ERROR sending verification email (register-new):', repr(e))
         print('Verification link (register-new):', verify_link)
 
-    resp = {'message': 'Email de Confirmação Enviado'}
-    if getattr(settings, 'DEBUG', False):
-        resp['debug_verify_link'] = verify_link
-    return Response(resp, status=201)
+        return Response({'message': 'Email de Confirmação de Cadastro Enviado'}, status=201)
 
 
 @api_view(['POST'])
@@ -258,7 +252,7 @@ def auth_verify_email(request):
         return Response({'detail': 'Token inválido ou expirado.'}, status=400)
     user.is_active = True
     user.save(update_fields=['is_active'])
-    return Response({'message': 'Conta verificada com sucesso.'})
+        return Response({'message': 'Usuário Registrado com Sucesso'})
 
 
 @api_view(['POST'])
@@ -304,10 +298,7 @@ def auth_resend_confirmation(request):
         print('Verification link (resend):', verify_link)
 
     msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
-    resp = {'message': msg}
-    if getattr(settings, 'DEBUG', False):
-        resp['debug_verify_link'] = verify_link
-    return Response(resp, status=200)
+    return Response({'message': msg}, status=200)
 
 
 
