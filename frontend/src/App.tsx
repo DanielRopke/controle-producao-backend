@@ -6,6 +6,7 @@ import { Toaster } from 'sonner'
 import PrazosSAP from './pages/PrazosSAP'
 import Obras from './pages/Obras'
 import Programacao from './pages/Programacao'
+import Faturamento from './pages/Faturamento'
 import Login from './pages/Login'
 import Cadastro from './pages/Cadastro'
 import RecuperacaoSenha from './pages/RecuperacaoSenha'
@@ -48,6 +49,7 @@ function AppContent() {
         <Route path="/prazos-sap" element={<PrazosSAP />} />
         <Route path="/teste" element={<TestePagina />} />
         <Route path="/programacao" element={<Programacao />} />
+  <Route path="/faturamento" element={<Faturamento />} />
         <Route path="/teste-botao" element={<TesteBotao />} />
         <Route path="/prazos-sap-simples" element={<PrazosSAPSimples />} />
         <Route path="/obras" element={<Obras />} />

@@ -206,6 +206,10 @@ export function getProgramacao(params: Record<string, string> = {}) {
   return axios.get(`${API_BASE}/programacao/`, { params })
 }
 
+export function getFaturamento(params: Record<string, string> = {}) {
+  return axios.get(`${API_BASE}/faturamento/`, { params })
+}
+
 export function getStatusEnerPep(params: Record<string, string> = {}) {
   return axios.get(`${API_BASE}/status-ener-pep/`, { params })
 }

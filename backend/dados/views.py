@@ -266,6 +266,21 @@ def programacao(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def faturamento(request):
+    """
+    Retorna dados da aba 'FATURAMENTO' da planilha.
+    """
+    try:
+        data = get_sheet_cached('FATURAMENTO')
+        return Response(data)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def carteira(request):
     """
     Retorna dados da aba 'Prazos SAP' da planilha.

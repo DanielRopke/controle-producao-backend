@@ -496,6 +496,8 @@ export default function PrazosSAP() {
 				if (isCancelled) return;
 				const data = (res.data || []) as MatrizItem[];
 				setRawRows(data);
+				// Informe de sucesso com quantidade de linhas carregadas
+				try { showToast(`PrazosSAP Carregado: ${data.length} linhas`); } catch { /* ignore toast errors */ }
 			} catch (e) {
 				console.error('Erro ao carregar matriz:', e);
 				setRawRows([]);

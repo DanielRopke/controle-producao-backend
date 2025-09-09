@@ -1,9 +1,15 @@
 import os
 from pathlib import Path
 import dj_database_url
+from dotenv import load_dotenv
 
 # Caminho base do projeto
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Carrega variáveis de ambiente de arquivos locais (somente em dev). Em produção,
+# as variáveis já vêm do ambiente do serviço (Render, etc.).
+load_dotenv(BASE_DIR / '.env')
+load_dotenv(BASE_DIR / '.env.local', override=True)
 
 # Chave secreta segura (mantenha segredo em produção!)
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'troque-essa-chave-para-producao')
@@ -103,6 +109,13 @@ else:
     CORS_ALLOWED_ORIGINS = FRONTEND_ORIGINS_LIST or [
         "https://www.controlesetup.com.br",
     ]
+
+# CSRF Trusted Origins (para evitar bloqueios em formulários quando aplicável)
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        'CSRF_TRUSTED_ORIGINS', 'http://localhost:5173,https://www.controlesetup.com.br'
+    ).split(',') if o.strip()
+]
 
 # Idioma e fuso horário
 LANGUAGE_CODE = 'pt-br'
