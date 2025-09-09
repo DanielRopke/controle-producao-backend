@@ -157,7 +157,12 @@ STATIC_ROOT = os.path.abspath(os.path.join(BASE_DIR, 'staticfiles'))
 # Evitar prints em produção
 
 # DURANTE O DESENVOLVIMENTO (opcional)
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+# Evita aviso em produção quando a pasta não existe
+_STATIC_DIR = os.path.join(BASE_DIR, 'static')
+if os.path.isdir(_STATIC_DIR):
+    STATICFILES_DIRS = [_STATIC_DIR]
+else:
+    STATICFILES_DIRS = []
 
 # WhiteNoise (servir os estáticos no Render sem nginx)
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
