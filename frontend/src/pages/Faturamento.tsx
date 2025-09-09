@@ -10,7 +10,8 @@ import * as XLSX from 'xlsx';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { PEPSearch } from '../components/PEPSearch';
 import { cn } from "../lib/utils";
-import { getFaturamento } from '../services/api';
+import { getFaturamento, formatAxiosError } from '../services/api';
+import axios from 'axios';
 import type { MatrizItem } from '../services/api';
 import { showToast } from '../components/toast';
 import LogoSetup from '../assets/LogoSetup1.png';
@@ -358,9 +359,25 @@ export default function Faturamento() {
       });
       setRawRows(mapped as unknown as MatrizItem[]);
       showToast(`Previsão de Faturamento carregada: ${mapped.length} linhas`);
+      // Tentativa de diagnosticar se o backend tem acesso às credenciais do Google Sheets no deploy
+      try {
+        const statusRes = await axios.get('/api/sheets-status/');
+        if (statusRes && statusRes.data) {
+          const s = statusRes.data;
+          console.info('sheets-status:', s);
+          // apenas notificamos de problemas óbvios (faltando variáveis/arquivos)
+          if (!s.env_GOOGLE_SHEETS_CREDENTIALS_JSON_BASE64 || !s.env_GOOGLE_SHEETS_SPREADSHEET_ID) {
+            showToast('Aviso: backend sem variáveis de Google Sheets configuradas (ver console).');
+          }
+        }
+      } catch (stErr) {
+        console.debug('Erro ao consultar /api/sheets-status/:', stErr);
+      }
     } catch (err) {
-      console.error('Erro ao carregar faturamento:', err);
-      showToast('Erro ao carregar faturamento via backend. Verifique logs do servidor.');
+  console.error('Erro ao carregar faturamento:', err);
+  try { setRawRows([]); } catch { /* ignore */ }
+  const msg = formatAxiosError(err);
+  showToast(`Erro ao carregar faturamento: ${msg}`);
     }
   }
 

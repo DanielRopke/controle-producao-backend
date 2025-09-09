@@ -18,7 +18,13 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'troque-essa-chave-para-producao')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
 # Domínios permitidos (env > default)
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'controle-producao-backend.onrender.com,localhost,127.0.0.1').split(',') if h.strip()]
+# Inclui wildcard para qualquer subdomínio do Render por segurança operacional
+ALLOWED_HOSTS = [
+    h.strip() for h in os.getenv(
+        'ALLOWED_HOSTS',
+        '.onrender.com,controle-producao-backend.onrender.com,localhost,127.0.0.1,controlesetup.com.br,www.controlesetup.com.br'
+    ).split(',') if h.strip()
+]
 
 # Aplicativos instalados
 INSTALLED_APPS = [

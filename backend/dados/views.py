@@ -2,9 +2,13 @@ from rest_framework.decorators import api_view, permission_classes
 # Nota: alteração inócua para acionar deploy no Render e testar envio de e-mail de confirmação (2)
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .google_sheets import get_sheet, get_gspread_client
+import os
+from django.conf import settings
+# Permissão padrão para endpoints GET: pública em DEV ou quando PUBLIC_READ=true
+DEFAULT_GET_PERMISSION = AllowAny if (getattr(settings, 'DEBUG', False) or os.getenv('PUBLIC_READ', '').lower() == 'true') else IsAuthenticated
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def colunas_planilha(request):
     """
     Retorna os títulos das colunas (cabecalhos) de uma aba da planilha.
@@ -35,6 +39,11 @@ import json
 import logging
 import threading
 import time
+import os
+from django.conf import settings
+
+# Permissão padrão para endpoints GET: pública em DEV ou quando PUBLIC_READ=true
+DEFAULT_GET_PERMISSION = AllowAny if (getattr(settings, 'DEBUG', False) or os.getenv('PUBLIC_READ', '').lower() == 'true') else IsAuthenticated
 
 # Cache simples em memória para dados de abas do Google Sheets
 _sheet_cache = {}
@@ -239,7 +248,7 @@ def auth_resend_confirmation(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def geral(request):
     """
     Retorna dados gerais da planilha 'GERAL'.
@@ -252,7 +261,7 @@ def geral(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def programacao(request):
     """
     Retorna dados da aba 'programação' da planilha.
@@ -265,7 +274,7 @@ def programacao(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def faturamento(request):
     """
     Retorna dados da aba 'FATURAMENTO' da planilha.
@@ -280,7 +289,7 @@ def faturamento(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def carteira(request):
     """
     Retorna dados da aba 'Prazos SAP' da planilha.
@@ -293,7 +302,7 @@ def carteira(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def meta(request):
     try:
         data = get_sheet_cached('meta')
@@ -303,7 +312,7 @@ def meta(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def seccionais(request):
     try:
         print('--- [LOG] INICIO /api/seccionais/ ---')
@@ -334,7 +343,7 @@ def seccionais(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def status_sap_unicos(request):
     try:
         print('--- [LOG] INICIO /api/status_sap_unicos/ ---')
@@ -365,7 +374,7 @@ def status_sap_unicos(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def defeitos(request):
     try:
         gc = get_gspread_client()
@@ -391,7 +400,7 @@ def defeitos(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def carteira_por_seccional(request):
     try:
         seccional_param = request.GET.get('seccional', '').strip()
@@ -410,7 +419,7 @@ def carteira_por_seccional(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def status_ener_pep(request):
     try:
         data = get_sheet_cached('Prazos SAP')
@@ -434,7 +443,7 @@ def status_ener_pep(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def status_conc_pep(request):
     try:
         data = get_sheet_cached('Prazos SAP')
@@ -458,7 +467,7 @@ def status_conc_pep(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def status_servico_contagem(request):
     try:
         seccional_filtro = request.GET.get('seccional', '').strip()
@@ -505,7 +514,7 @@ def status_servico_contagem(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def seccional_rs_pep(request):
     try:
         data = get_sheet_cached('Prazos SAP')
@@ -555,7 +564,7 @@ def seccional_rs_pep(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def matriz_dados(request):
     try:
         seccional_filtro = request.GET.get('seccional', '').strip()
@@ -637,7 +646,37 @@ def matriz_dados(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
+def sheets_status(request):
+    """
+    Endpoint de diagnóstico (não expõe segredos): informa apenas se as
+    variáveis de ambiente e arquivos locais de credenciais/ID da planilha
+    estão presentes. Útil para depurar deploys onde o Google Sheets não é
+    acessível.
+    """
+    try:
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        local_cred_txt = os.path.join(backend_dir, 'cred_base64.txt')
+        local_cred_json = os.path.join(backend_dir, 'cred.json')
+        env_cred = bool(os.environ.get('GOOGLE_SHEETS_CREDENTIALS_JSON_BASE64'))
+        env_sheet = bool(os.environ.get('GOOGLE_SHEETS_SPREADSHEET_ID'))
+        exists_local_txt = os.path.exists(local_cred_txt)
+        exists_local_json = os.path.exists(local_cred_json)
+        return Response({
+            'env_GOOGLE_SHEETS_CREDENTIALS_JSON_BASE64': env_cred,
+            'env_GOOGLE_SHEETS_SPREADSHEET_ID': env_sheet,
+            'local_cred_base64_txt_exists': exists_local_txt,
+            'local_cred_json_exists': exists_local_json,
+            'allowed_hosts_active': getattr(settings, 'ALLOWED_HOSTS', []),
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def tipos_unicos(request):
     try:
         data = get_sheet_cached('Prazos SAP')
@@ -654,7 +693,7 @@ def tipos_unicos(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([DEFAULT_GET_PERMISSION])
 def meses_conclusao(request):
     try:
         data = get_sheet_cached('Prazos SAP')
