@@ -5,6 +5,28 @@ from .google_sheets import get_sheet, get_gspread_client
 import os
 from django.conf import settings
 
+# Determina a base do frontend a ser usada em links enviados por e-mail.
+def _get_frontend_base():
+    """Retorna uma URL base para o frontend.
+
+    1) Usa settings.FRONTEND_BASE_URL se definido.
+    2) Se apontar para localhost e houver variável de ambiente RENDER_EXTERNAL_URL ou RENDER_EXTERNAL_HOSTNAME,
+       usa essas para montar a URL de produção.
+    3) Garante que o retorno não termine com '/'.
+    """
+    fb = getattr(settings, 'FRONTEND_BASE_URL', '').strip()
+    # Preferir RENDER_EXTERNAL_URL se disponível (caso de deploy em Render)
+    render_url = os.getenv('RENDER_EXTERNAL_URL') or os.getenv('RENDER_EXTERNAL_HOSTNAME')
+    if fb:
+        if ('localhost' in fb or fb.startswith('http://127.0.0.1')) and render_url:
+            fb = render_url
+    else:
+        fb = render_url or fb
+    if not fb:
+        # Fallback seguro: use https://controlesetup.com.br para evitar enviar localhost por acidente
+        fb = 'https://controlesetup.com.br'
+    return fb.rstrip('/')
+
 # Utilitário para normalizar rótulos vindos da planilha (remove quebras de linha, espaços invisíveis e colapsa espaços)
 def _clean_label(value):
     try:
@@ -161,7 +183,7 @@ def auth_register(request):
         # Caso 2: usuário existe e está inativo -> enviar/verificar email novamente
         uid = urlsafe_base64_encode(force_bytes(existing.pk))
         token = default_token_generator.make_token(existing)
-        frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
+        frontend_base = _get_frontend_base()
         verify_link = f"{frontend_base}/cadastro?uid={uid}&token={token}"
 
         subject = "Verifique seu cadastro"
@@ -197,7 +219,7 @@ def auth_register(request):
 
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
-    frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
+    frontend_base = _get_frontend_base()
     verify_link = f"{frontend_base}/cadastro?uid={uid}&token={token}"
 
     subject = "Verifique seu cadastro"
@@ -265,7 +287,7 @@ def auth_resend_confirmation(request):
 
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
-    frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
+    frontend_base = _get_frontend_base()
     verify_link = f"{frontend_base}/cadastro?uid={uid}&token={token}"
 
     subject = "Verifique seu cadastro"
