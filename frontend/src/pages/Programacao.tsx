@@ -100,108 +100,118 @@ export default function Programacao() {
   const clearPepSearch = () => { setPepSearch(''); showToast('Pesquisa PEP limpa!'); };
 
   const handleSort = (key: keyof MatrixRow) => {
-    // se for a mesma coluna, alterna
-    if (sortConfig.key === key) {
-      setSortConfig({ key, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' });
-      return;
-    }
-    // primeira vez: numéricos e datas começam em 'desc' (maior → menor / mais novo → mais antigo)
-    const numericKeys: (keyof MatrixRow)[] = ['valorProgramado', 'valorConcluido', 'valorParcial', 'valorCancelado'];
-    if (numericKeys.includes(key) || key === 'data') {
-      setSortConfig({ key, direction: 'desc' });
-    } else {
-      setSortConfig({ key, direction: 'asc' });
-    }
-  };
+    // Dados calculados (mantém estrutura para matriz e filtros)
+    const filteredData = React.useMemo(() => {
+      const anyHasEner = rawRows.some(r => (r.statusEner || '').toString().trim());
+      const anyHasConc = rawRows.some(r => (r.statusConc || '').toString().trim());
+      const anyHasMotivos = rawRows.some(r => (r.statusServico || '').toString().trim());
 
-  const getSortIcon = (columnKey: keyof MatrixRow) => {
-    if (sortConfig.key !== columnKey) return <ChevronsUpDown className="w-4 h-4 text-gray-500" />;
-    return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-green-600" /> : <ChevronDown className="w-4 h-4 text-green-600" />;
-  };
+      const regionFilterForOthers = (activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : undefined)) as string | undefined;
+      let rowsForOthers = rawRows.slice();
+      if (regionFilterForOthers) rowsForOthers = rowsForOthers.filter(r => String(r.seccional || '').trim() === regionFilterForOthers);
 
-  // Ref para o wrapper da tabela (usado para rolamento automático)
-  const tableWrapperRef = useRef<HTMLDivElement | null>(null);
+      // Aplicar filtros selecionados localmente (usando colunas da aba 'programação')
+      if (selectedStatusSap) rowsForOthers = rowsForOthers.filter(r => String(r.statusSap || '').trim() === selectedStatusSap);
+      if (selectedTipo) rowsForOthers = rowsForOthers.filter(r => String(r.tipo || '').trim() === selectedTipo);
+      if (selectedMes) rowsForOthers = rowsForOthers.filter(r => String((r as unknown as Record<string, unknown>).anoCiclo ?? (r as unknown as Record<string, unknown>)['Ano ciclo'] ?? '').trim() === selectedMes);
+      if (activeFilters.statusENER && anyHasEner) rowsForOthers = rowsForOthers.filter(r => String(r.statusEner || '').trim() === activeFilters.statusENER);
+      if (activeFilters.statusCONC && anyHasConc) rowsForOthers = rowsForOthers.filter(r => String(r.statusConc || '').trim() === activeFilters.statusCONC);
+      if (activeFilters.reasons && anyHasMotivos) rowsForOthers = rowsForOthers.filter(r => String(r.statusServico || '').trim() === activeFilters.reasons);
+      if (pepSearch.trim()) rowsForOthers = rowsForOthers.filter(r => String(r.pep || '').toLowerCase().includes(pepSearch.toLowerCase()));
 
-  const scrollToRow = (idx: number) => {
-    try {
-      const container = tableWrapperRef.current;
-      let el: HTMLElement | null = null;
-      if (container) el = container.querySelector(`[data-row-index="${idx}"]`);
-      if (!el) el = document.querySelector(`[data-row-index="${idx}"]`);
-      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    } catch (err) { console.debug('scrollToRow error', err); }
-  };
+      // Mapear para as colunas da tabela
+      const tableRows: MatrixRow[] = rowsForOthers.map(r => {
+        const rowObj = r as unknown as Record<string, unknown>;
+        const parseMoney = (v: unknown) => {
+          if (v == null) return 0;
+          if (typeof v === 'number') return v;
+          const s = String(v);
+          const cleaned = s.replace(/R\$/i, '').replace(/\./g, '').replace(/,/g, '.').trim();
+          const n = parseFloat(cleaned);
+          return Number.isNaN(n) ? 0 : n;
+        };
+        return {
+          data: String(rowObj['DATA'] ?? rowObj['Data'] ?? rowObj['data'] ?? ''),
+          pep: String(rowObj['PEP/ORDEM'] ?? rowObj['PEP'] ?? rowObj['pep'] ?? ''),
+          valorProgramado: parseMoney(rowObj['Valor programado'] ?? rowObj['Valor Programado'] ?? rowObj['valorProgramado'] ?? rowObj['valor'] ?? 0),
+          valorConcluido: parseMoney(rowObj['Valor concluído'] ?? rowObj['Valor Concluído'] ?? rowObj['valorConcluido'] ?? 0),
+          valorParcial: parseMoney(rowObj['Valor parcial'] ?? rowObj['Valor Parcial'] ?? rowObj['valorParcial'] ?? 0),
+          valorCancelado: parseMoney(rowObj['Valor cancelado'] ?? rowObj['Valor Cancelado'] ?? rowObj['valorCancelado'] ?? 0),
+          statusProg: String(rowObj['STATUS RETORNO PROG 2'] ?? rowObj['STATUS RETORNO PROG'] ?? rowObj['statusSap'] ?? ''),
+          motivoNaoCumprimento: String(rowObj['MOTIVO NÃO CUMPRIMENTO DA PROG'] ?? rowObj['Motivo Não Cumprimento'] ?? rowObj['motivoNaoCumprimento'] ?? ''),
+          motivoPrioridade: String(rowObj['Motivo Prioridade'] ?? rowObj['motivoPrioridade'] ?? ''),
+          prioridade: String(rowObj['Prioridade'] ?? rowObj['prioridade'] ?? ''),
+        } as MatrixRow;
+      });
 
-  // Dados calculados (mantém estrutura para matriz e filtros)
-  const filteredData = React.useMemo(() => {
-    const anyHasEner = rawRows.some(r => (r.statusEner || '').trim());
-    const anyHasConc = rawRows.some(r => (r.statusConc || '').trim());
-    const anyHasMotivos = rawRows.some(r => (r.statusServico || '').trim());
+      // Filtro de data (inclusivo)
+      if (selectedStartDate || selectedEndDate) {
+        const startTs = selectedStartDate ? new Date(selectedStartDate).setHours(0,0,0,0) : Number.NEGATIVE_INFINITY;
+        const endTs = selectedEndDate ? new Date(selectedEndDate).setHours(23,59,59,999) : Number.POSITIVE_INFINITY;
+        const parseDateSimple = (s: string): number => {
+          if (!s) return Number.NaN;
+          const str = String(s).trim();
+          const m = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+          if (m) {
+            const d = Number(m[1]);
+            const mo = Number(m[2]) - 1;
+            let y = Number(m[3]);
+            if (y < 100) y += 2000;
+            const dt = new Date(y, mo, d);
+            if (!Number.isNaN(dt.getTime())) return dt.getTime();
+          }
+          const t = Date.parse(str);
+          return Number.isNaN(t) ? Number.NaN : t;
+        };
+        // aplicar
+        const filtered = tableRows.filter(r => {
+          const ts = parseDateSimple(r.data || '');
+          if (Number.isNaN(ts)) return false;
+          return ts >= startTs && ts <= endTs;
+        });
+        // substituir
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        // assign filtered back to tableRows variable used below
+        // (create a shallow copy to keep typing consistent)
+        // @ts-ignore
+        tableRows.splice(0, tableRows.length, ...filtered);
+      }
 
-    const regionFilterForOthers = (activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : undefined)) as string | undefined;
-    let rowsForOthers = rawRows;
-    if (regionFilterForOthers) rowsForOthers = rowsForOthers.filter(r => (r.seccional || '').trim() === regionFilterForOthers);
-  // Aplicar filtros selecionados localmente (usando colunas da aba 'programação')
-    if (selectedStatusSap) rowsForOthers = rowsForOthers.filter(r => (r.statusSap || '').trim() === selectedStatusSap);
-    if (selectedTipo) rowsForOthers = rowsForOthers.filter(r => (r.tipo || '').trim() === selectedTipo);
-    if (selectedMes) rowsForOthers = rowsForOthers.filter(r => {
-      const rowObj = r as unknown as Record<string, unknown>;
-      return String(rowObj['anoCiclo'] ?? rowObj['Ano ciclo'] ?? '').trim() === selectedMes;
-    });
-    if (activeFilters.statusENER && anyHasEner) rowsForOthers = rowsForOthers.filter(r => (r.statusEner || '').trim() === activeFilters.statusENER);
-    if (activeFilters.statusCONC && anyHasConc) rowsForOthers = rowsForOthers.filter(r => (r.statusConc || '').trim() === activeFilters.statusCONC);
-    if (activeFilters.reasons && anyHasMotivos) rowsForOthers = rowsForOthers.filter(r => (r.statusServico || '').trim() === activeFilters.reasons);
-    if (pepSearch.trim()) rowsForOthers = rowsForOthers.filter(r => (r.pep || '').toLowerCase().includes(pepSearch.toLowerCase()));
+      // Ordenação
+      if (sortConfig.key) {
+        const parseDateForSort = (s: string): number => {
+          if (!s) return Number.NaN;
+          const str = String(s).trim();
+          const m = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+          if (m) {
+            const d = Number(m[1]); const mo = Number(m[2]) - 1; let y = Number(m[3]); if (y < 100) y += 2000; const dt = new Date(y, mo, d); if (!Number.isNaN(dt.getTime())) return dt.getTime();
+          }
+          const t = Date.parse(str); return Number.isNaN(t) ? Number.NaN : t;
+        };
+        tableRows.sort((a, b) => {
+          const key = sortConfig.key as keyof MatrixRow;
+          const dir = sortConfig.direction === 'asc' ? 1 : -1;
+          const aValue = a[key]; const bValue = b[key];
+          if (key === 'valorProgramado' || key === 'valorConcluido' || key === 'valorParcial' || key === 'valorCancelado') {
+            const an = Number(aValue); const bn = Number(bValue);
+            if (Number.isNaN(an) && Number.isNaN(bn)) return 0;
+            if (Number.isNaN(an)) return 1;
+            if (Number.isNaN(bn)) return -1;
+            return dir * (an - bn);
+          }
+          if (key === 'data') {
+            const da = parseDateForSort(String(aValue)); const db = parseDateForSort(String(bValue));
+            if (Number.isNaN(da) && Number.isNaN(db)) return 0;
+            if (Number.isNaN(da)) return 1;
+            if (Number.isNaN(db)) return -1;
+            return dir * (da - db);
+          }
+          const aStr = String(aValue || '').toLowerCase(); const bStr = String(bValue || '').toLowerCase(); if (aStr === bStr) return 0; return dir * (aStr < bStr ? -1 : 1);
+        });
+      }
 
-  // (Gráficos removidos nesta página) — não precisamos de agregações específicas aqui
-
-    // Para a matriz: mapear para as colunas solicitadas
-    let tableRows = rowsForOthers.map(r => {
-      const rowObj = r as unknown as Record<string, unknown>;
-      const parseMoney = (v: unknown) => {
-        if (v == null) return 0;
-        if (typeof v === 'number') return v;
-        const s = String(v);
-        const cleaned = s.replace(/R\$/i, '').replace(/\./g, '').replace(/,/g, '.').trim();
-        const n = parseFloat(cleaned);
-        return Number.isNaN(n) ? 0 : n;
-      };
-      return {
-        data: String(rowObj['DATA'] ?? rowObj['Data'] ?? ''),
-        pep: String(rowObj['PEP/ORDEM'] ?? rowObj['PEP'] ?? rowObj['pep'] ?? ''),
-        valorProgramado: parseMoney(rowObj['Valor programado'] ?? rowObj['Valor Programado'] ?? rowObj['valorProgramado'] ?? rowObj['valor'] ?? 0),
-        valorConcluido: parseMoney(rowObj['Valor concluído'] ?? rowObj['Valor Concluído'] ?? rowObj['valorConcluido'] ?? 0),
-        valorParcial: parseMoney(rowObj['Valor parcial'] ?? rowObj['Valor Parcial'] ?? rowObj['valorParcial'] ?? 0),
-        valorCancelado: parseMoney(rowObj['Valor cancelado'] ?? rowObj['Valor Cancelado'] ?? rowObj['valorCancelado'] ?? 0),
-        statusProg: String(rowObj['STATUS RETORNO PROG 2'] ?? rowObj['STATUS RETORNO PROG'] ?? rowObj['statusSap'] ?? ''),
-        motivoNaoCumprimento: String(rowObj['MOTIVO NÃO CUMPRIMENTO DA PROG'] ?? rowObj['Motivo Não Cumprimento'] ?? ''),
-        motivoPrioridade: String(rowObj['Motivo Prioridade'] ?? rowObj['motivoPrioridade'] ?? ''),
-        prioridade: String(rowObj['Prioridade'] ?? rowObj['prioridade'] ?? ''),
-      } as MatrixRow;
-    });
-
-    if (sortConfig.key) {
-      // Parser de data robusto: aceita dd/mm/yyyy, dd/mm/yy e separadores variados (/, -, .)
-      const parseDate = (s: string): number => {
-        if (!s) return Number.NaN;
-        const str = String(s).trim();
-        // dd{sep}mm{sep}yyyy ou dd{sep}mm{sep}yy
-        const m = str.match(/^(\d{1,2})[^\d](\d{1,2})[^\d](\d{2,4})$/);
-        if (m) {
-          const d = Number(m[1]);
-          const mo = Number(m[2]) - 1;
-          let y = Number(m[3]);
-          if (y < 100) y += 2000; // trata anos de 2 dígitos como 20xx
-          const dt = new Date(y, mo, d);
-          if (!Number.isNaN(dt.getTime())) return dt.getTime();
-        }
-        // fallback: tenta Date.parse
-        const t = Date.parse(str);
-        return Number.isNaN(t) ? Number.NaN : t;
-      };
-
-      tableRows = [...tableRows].sort((a, b) => {
-        const key = sortConfig.key! as keyof typeof tableRows[0];
+      return { matrix: tableRows } as { matrix: MatrixRow[] };
+    }, [rawRows, selectedRegion, activeFilters, pepSearch, sortConfig, selectedStatusSap, selectedTipo, selectedMes, selectedStartDate, selectedEndDate]);
         const dir = sortConfig.direction === 'asc' ? 1 : -1;
         const aValue = a[key];
         const bValue = b[key];

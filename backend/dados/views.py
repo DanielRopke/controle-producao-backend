@@ -205,9 +205,9 @@ def auth_register(request):
             print('ERROR sending verification email (register-existing-inactive):', repr(e))
             print('Verification link (register-existing-inactive):', verify_link)
 
-        # Mensagem depende apenas do estado do timer no frontend
-        msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
-            return Response({'message': msg}, status=200)
+    # Mensagem depende apenas do estado do timer no frontend
+    msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
+    return Response({'message': msg}, status=200)
 
     # Caso 3: não existe -> criar e enviar
     ser = RegisterSerializer(data=data)
@@ -252,7 +252,7 @@ def auth_verify_email(request):
         return Response({'detail': 'Token inválido ou expirado.'}, status=400)
     user.is_active = True
     user.save(update_fields=['is_active'])
-        return Response({'message': 'Usuário Registrado com Sucesso'})
+    return Response({'message': 'Usuário Registrado com Sucesso'})
 
 
 @api_view(['POST'])
