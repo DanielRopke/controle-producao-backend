@@ -963,7 +963,7 @@ export default function PrazosSAP() {
 										<ResponsiveContainer width="100%" height="100%">
 											<BarChart data={filteredData.reasons} margin={{ top: 20, right: 15, bottom: 50, left: 15 }}>
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-												<XAxis dataKey="name" fontSize={12} tickMargin={8} tick={(props: unknown) => {
+												<XAxis dataKey="name" fontSize={12} tickMargin={8} interval={0} minTickGap={0} tick={(props: unknown) => {
 													const p = props as ChartTickProps;
 													const value = p && p.payload ? p.payload.value : '';
 													return (

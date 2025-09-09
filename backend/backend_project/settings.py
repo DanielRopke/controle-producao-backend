@@ -130,6 +130,7 @@ if DEBUG:
 else:
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = FRONTEND_ORIGINS_LIST or [
+        "https://controlesetup.com.br",
         "https://www.controlesetup.com.br",
     ]
 
@@ -182,7 +183,11 @@ REST_FRAMEWORK = {
 }
 
 # ====== E-mail e Links ======
-FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173')
+# Base do frontend: em DEV cai para localhost; em produção cai para domínio público se env não estiver setado.
+if DEBUG:
+    FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://localhost:5173')
+else:
+    FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'https://controlesetup.com.br')
 
 if os.getenv('EMAIL_HOST'):
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

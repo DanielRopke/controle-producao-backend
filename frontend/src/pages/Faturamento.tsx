@@ -360,20 +360,13 @@ export default function Faturamento() {
       });
       setRawRows(mapped as unknown as MatrizItem[]);
       showToast(`Previsão de Faturamento carregada: ${mapped.length} linhas`);
-      // Diagnóstico: só alerta se não houver NENHUMA forma de credencial/ID (nem env, nem arquivos locais)
+    // Diagnóstico: apenas loga no console; não exibe toast para evitar ruído quando a página carrega normalmente
       try {
         const statusRes = await axios.get('/api/sheets-status/');
         if (statusRes && statusRes.data) {
           const s = statusRes.data;
           console.info('sheets-status:', s);
-          const hasSomeCred = Boolean(s.env_GOOGLE_SHEETS_CREDENTIALS_JSON_BASE64) || Boolean(s.local_cred_base64_txt_exists) || Boolean(s.local_cred_json_exists);
-          const hasSpreadsheetId = Boolean(s.env_GOOGLE_SHEETS_SPREADSHEET_ID);
-          if (!hasSomeCred || !hasSpreadsheetId) {
-            // Só alerta quando faltar ambos (credencial e ID), indicando provável falha real
-            if (!hasSomeCred && !hasSpreadsheetId) {
-              showToast('Aviso: backend sem credenciais/ID do Google Sheets (ver console).');
-            }
-          }
+      // Sem toast: problemas reais aparecerão no carregamento da tabela/gráficos
         }
       } catch (stErr) {
         console.debug('Erro ao consultar /api/sheets-status/:', stErr);

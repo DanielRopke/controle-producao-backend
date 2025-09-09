@@ -15,6 +15,12 @@ def _clean_label(value):
         return ""
     # remove quebras de linha internas e substitui por espaço
     s = s.replace("\r", " ").replace("\n", " ")
+    # normaliza espaços especiais (NBSP e afins) para espaço comum
+    s = (
+        s.replace("\u00A0", " ")  # NO-BREAK SPACE
+         .replace("\u202F", " ")  # NARROW NO-BREAK SPACE
+         .replace("\u2007", " ")  # FIGURE SPACE
+    )
     # remove caracteres de largura zero
     s = (
         s.replace("\u200b", "")
@@ -65,8 +71,7 @@ import time
 import os
 from django.conf import settings
 
-# Permissão padrão para endpoints GET: pública em DEV ou quando PUBLIC_READ=true
-DEFAULT_GET_PERMISSION = AllowAny if (getattr(settings, 'DEBUG', False) or os.getenv('PUBLIC_READ', '').lower() == 'true') else IsAuthenticated
+# (remoção de redefinição duplicada de DEFAULT_GET_PERMISSION)
 
 # Cache simples em memória para dados de abas do Google Sheets
 _sheet_cache = {}
@@ -85,6 +90,22 @@ def get_sheet_cached(sheet_name):
         data = get_sheet(sheet_name)
         _sheet_cache[sheet_name] = (now, data)
         return data
+
+# Helper: permite forçar bypass do cache via query param nocache=1
+def get_sheet_maybe_cached(sheet_name, request=None):
+    try:
+        nocache = False
+        if request is not None:
+            try:
+                nocache = str(request.GET.get('nocache', '')).strip() in ('1', 'true', 'True')
+            except Exception:
+                nocache = False
+        if nocache:
+            return get_sheet(sheet_name)
+    except Exception:
+        # fallback seguro ao cache em caso de erro ao ler query
+        pass
+    return get_sheet_cached(sheet_name)
 from .planilha import carregar_planilha_como_dataframe
 from .serializers import MatrizItemSerializer, RegisterSerializer
 from dateutil.parser import parse
@@ -498,7 +519,8 @@ def status_servico_contagem(request):
         status_sap_filtro = request.GET.get('status_sap', '').strip()
         tipo_filtro = request.GET.get('tipo', '').strip()
         mes_filtro = request.GET.get('mes', '').strip()
-        data = get_sheet_cached('Prazos SAP')
+
+        data = get_sheet_maybe_cached('Prazos SAP', request)
         contagem = {}
         for row in data:
             status = _clean_label(row.get('status serviço') or row.get('STATUS SERVIÇO') or row.get('Status Serviço') or row.get('status servico'))
@@ -537,7 +559,7 @@ def status_servico_contagem(request):
 @permission_classes([DEFAULT_GET_PERMISSION])
 def seccional_rs_pep(request):
     try:
-        data = get_sheet_cached('Prazos SAP')
+        data = get_sheet_maybe_cached('Prazos SAP', request)
         seccional_filtro = request.GET.get('seccional', '').strip()
         seccionais = [s.strip() for s in seccional_filtro.split(',') if s.strip()] if seccional_filtro else []
         status_sap_filtro = request.GET.get('status_sap', '').strip()
@@ -598,7 +620,11 @@ def matriz_dados(request):
         status_saps = [s.strip() for s in status_sap_filtro.split(',') if s.strip()] if status_sap_filtro else []
         tipos = [s.strip() for s in tipo_filtro.split(',') if s.strip()] if tipo_filtro else []
 
-        dados = carregar_planilha_como_dataframe('Prazos SAP')
+        # Respeita nocache para refletir alterações imediatamente quando solicitado
+        if str(request.GET.get('nocache', '')).strip() in ('1', 'true', 'True'):
+            dados = get_sheet('Prazos SAP')
+        else:
+            dados = carregar_planilha_como_dataframe('Prazos SAP')
         dados_filtrados = []
 
         for row in dados:
