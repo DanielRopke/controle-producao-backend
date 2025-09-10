@@ -7,6 +7,21 @@ interface DateRangeFilterProps {
   onEndDateChange: (date: Date | undefined) => void;
 }
 
+// Formata uma Date para YYYY-MM-DD no fuso local (para usar em inputs type=date)
+const formatLocalYMD = (d?: Date) => {
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+// Cria uma Date representando meia-noite no fuso local a partir da string YYYY-MM-DD
+const parseLocalYMD = (s: string) => {
+  // usar o formato 'YYYY-MM-DDTHH:mm' (sem timezone) faz o parser criar a Date no fuso local
+  return new Date(`${s}T00:00`);
+};
+
 export function DateRangeFilter({ 
   startDate, 
   endDate, 
@@ -24,8 +39,8 @@ export function DateRangeFilter({
           <CalendarDays className="w-4 h-4 text-gray-500" />
           <input
             type="date"
-            value={startDate ? startDate.toISOString().split('T')[0] : ''}
-            onChange={(e) => onStartDateChange(e.target.value ? new Date(e.target.value) : undefined)}
+            value={formatLocalYMD(startDate)}
+            onChange={(e) => onStartDateChange(e.target.value ? parseLocalYMD(e.target.value) : undefined)}
             className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             placeholder="Data início"
           />
@@ -34,8 +49,8 @@ export function DateRangeFilter({
           <CalendarDays className="w-4 h-4 text-gray-500" />
           <input
             type="date"
-            value={endDate ? endDate.toISOString().split('T')[0] : ''}
-            onChange={(e) => onEndDateChange(e.target.value ? new Date(e.target.value) : undefined)}
+            value={formatLocalYMD(endDate)}
+            onChange={(e) => onEndDateChange(e.target.value ? parseLocalYMD(e.target.value) : undefined)}
             className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             placeholder="Data fim"
           />
