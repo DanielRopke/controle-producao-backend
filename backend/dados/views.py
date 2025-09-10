@@ -661,14 +661,20 @@ def matriz_dados(request):
                 except:
                     continue
 
-            if data_inicio and data_fim:
+            # Suporta filtro com apenas data_inicio e/ou apenas data_fim
+            if data_inicio or data_fim:
                 try:
                     dt = parse(data_conclusao, dayfirst=True).date()
-                    dt_inicio = parse(data_inicio, dayfirst=True).date()
-                    dt_fim = parse(data_fim, dayfirst=True).date()
-                    if not (dt_inicio <= dt <= dt_fim):
-                        continue
+                    if data_inicio:
+                        dt_inicio = parse(data_inicio, dayfirst=True).date()
+                        if dt < dt_inicio:
+                            continue
+                    if data_fim:
+                        dt_fim = parse(data_fim, dayfirst=True).date()
+                        if dt > dt_fim:
+                            continue
                 except:
+                    # se não for possível parsear datas, manter comportamento atual (descartar linha)
                     continue
 
             pep = row.get('PEP')
