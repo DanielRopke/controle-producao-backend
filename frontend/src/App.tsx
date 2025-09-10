@@ -48,7 +48,7 @@ function AppContent() {
         <Route path="/prazos-sap-1" element={<PrazosSAP />} />
         <Route path="/prazos-sap" element={<PrazosSAP />} />
         <Route path="/teste" element={<TestePagina />} />
-        <Route path="/programacao" element={<Programacao />} />
+  <Route path="/programacao" element={<Programacao />} />
   <Route path="/faturamento" element={<Faturamento />} />
         <Route path="/teste-botao" element={<TesteBotao />} />
         <Route path="/prazos-sap-simples" element={<PrazosSAPSimples />} />
