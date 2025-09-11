@@ -139,6 +139,12 @@ export const api = {
   }
 }
 
+// Check email existence / status (used by Cadastro to decide button label)
+;(api as any).checkEmail = async (email: string) => {
+  const res = await axios.post(`${API_BASE}/auth/check-email`, { email })
+  return res.data as { exists: boolean; is_active: boolean }
+}
+
 // ------------------ Agregação para Dashboard ------------------
 export async function loadDashboardData(filters: BaseFilters | ExtendedFilters = {}): Promise<DashboardAggregated> {
   const [regions, statusEnerRaw, statusConcRaw, seccionalRSRaw, statusServicoRaw, matriz] = await Promise.all([

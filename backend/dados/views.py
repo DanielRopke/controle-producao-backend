@@ -444,6 +444,25 @@ def outbound_ip(request):
     return JsonResponse({'ip': ip})
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def auth_check_email(request):
+    """Retorna se o e-mail existe e se está ativo.
+
+    Entrada: { email: string }
+    Saída: { exists: bool, is_active: bool }
+    """
+    data = request.data or {}
+    email = (data.get('email') or '').strip().lower()
+    if not email:
+        return Response({'error': 'email missing'}, status=400)
+    try:
+        user = User.objects.get(email__iexact=email)
+        return Response({'exists': True, 'is_active': bool(user.is_active)})
+    except User.DoesNotExist:
+        return Response({'exists': False, 'is_active': False})
+
+
 
 
 

@@ -286,6 +286,23 @@ export default function Cadastro() {
                   setUsername(localPart)
                 }
               }}
+              onBlur={async (e)=>{
+                const v = e.currentTarget.value.trim().toLowerCase()
+                if (!v) return
+                try {
+                  const resp = await (api as any).checkEmail(v)
+                  if (resp && resp.exists === false) {
+                    // se o backend diz que o e-mail nao existe, limpar chave localStorage
+                    const key = `register_firstSentAt:${v}`
+                    try { localStorage.removeItem(key) } catch(e){ }
+                    // atualizar estado local para refletir limpeza
+                    setFirstSentAt(null)
+                    setRemainingSeconds(0)
+                  }
+                } catch (err) {
+                  // falha silenciosa: não bloquear o fluxo por erro de rede
+                }
+              }}
               placeholder="seu.nome@gruposetup.com"
               required
             />
