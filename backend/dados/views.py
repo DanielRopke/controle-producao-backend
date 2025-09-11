@@ -142,6 +142,7 @@ from django.conf import settings
 from django.db.models import Q
 import smtplib
 import socket
+import re
 
 User = get_user_model()
 
@@ -504,6 +505,43 @@ def debug_test_smtp(request):
         results['recovery'] = {'ok': False, 'note': 'No RECOVERY_EMAIL_HOST configured'}
 
     return JsonResponse(results)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def debug_send_test_email(request):
+    """
+    Envia um e-mail de teste usando o backend padrão (DEFAULT_FROM_EMAIL).
+    Protegido por secret via query param `secret` ou header `X-Test-Email-Secret`.
+    Body JSON: { "to": "alvo@dominio.com" }
+    """
+    secret = request.GET.get('secret') or request.headers.get('X-Test-Email-Secret')
+    expected = os.environ.get('TEST_EMAIL_SECRET')
+    if not expected or secret != expected:
+        return JsonResponse({'error': 'unauthorized'}, status=403)
+
+    data = request.data or {}
+    to_email = (data.get('to') or '').strip()
+    if not to_email:
+        return JsonResponse({'error': 'missing "to"'}, status=400)
+    # validação simples de e-mail
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", to_email):
+        return JsonResponse({'error': 'invalid email'}, status=400)
+
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br')
+    host = getattr(settings, 'EMAIL_HOST', 'unknown')
+    port = getattr(settings, 'EMAIL_PORT', 587)
+    try:
+        subject = 'Teste de envio (DEFAULT_FROM_EMAIL)'
+        body = (
+            'Este é um e-mail de teste enviado pelo backend Django.\n\n'
+            f'From: {from_email}\n'
+            f'SMTP: {host}:{port}\n'
+        )
+        send_mail(subject, body, from_email, [to_email], fail_silently=False)
+        return JsonResponse({'sent': True, 'from': from_email, 'to': to_email, 'host': host, 'port': port})
+    except Exception as e:
+        return JsonResponse({'sent': False, 'error': str(e)}, status=500)
 
 
 @api_view(['POST'])
