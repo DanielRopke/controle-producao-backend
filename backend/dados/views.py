@@ -343,8 +343,8 @@ def auth_password_reset(request):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         frontend_base = _get_frontend_base()
-    # Link padrão: apontar para a página de confirmação específica (/recuperacao-senha/confirm)
-    reset_link = f"{frontend_base}/recuperacao-senha/confirm?uid={uid}&token={token}"
+        # Link padrão: apontar para a página de confirmação específica (/recuperacao-senha/confirm)
+        reset_link = f"{frontend_base}/recuperacao-senha/confirm?uid={uid}&token={token}"
 
         subject = 'Recuperação de Senha'
         body = (
