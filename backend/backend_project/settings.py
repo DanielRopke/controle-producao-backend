@@ -205,3 +205,20 @@ if os.getenv('EMAIL_HOST'):
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'no-reply@controlesetup.com.br'
+
+# Configurações opcionais para conta de e-mail usada apenas em envios de recuperação de senha
+# Se RECOVERY_EMAIL_HOST estiver presente, o aplicativo usará essas configurações quando solicitadas.
+RECOVERY_EMAIL_HOST = os.getenv('RECOVERY_EMAIL_HOST')
+if RECOVERY_EMAIL_HOST:
+    RECOVERY_EMAIL_PORT = int(os.getenv('RECOVERY_EMAIL_PORT', os.getenv('EMAIL_PORT', '587')))
+    RECOVERY_EMAIL_HOST_USER = os.getenv('RECOVERY_EMAIL_HOST_USER', os.getenv('EMAIL_HOST_USER'))
+    RECOVERY_EMAIL_HOST_PASSWORD = os.getenv('RECOVERY_EMAIL_HOST_PASSWORD', os.getenv('EMAIL_HOST_PASSWORD'))
+    RECOVERY_EMAIL_USE_TLS = os.getenv('RECOVERY_EMAIL_USE_TLS', str(os.getenv('EMAIL_USE_TLS', 'true'))).lower() == 'true'
+    RECOVERY_DEFAULT_FROM_EMAIL = os.getenv('RECOVERY_DEFAULT_FROM_EMAIL', RECOVERY_EMAIL_HOST_USER or DEFAULT_FROM_EMAIL)
+else:
+    RECOVERY_EMAIL_HOST = None
+    RECOVERY_EMAIL_PORT = None
+    RECOVERY_EMAIL_HOST_USER = None
+    RECOVERY_EMAIL_HOST_PASSWORD = None
+    RECOVERY_EMAIL_USE_TLS = False
+    RECOVERY_DEFAULT_FROM_EMAIL = DEFAULT_FROM_EMAIL

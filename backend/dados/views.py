@@ -137,7 +137,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
-from django.core.mail import send_mail
+from django.core.mail import send_mail, get_connection
 from django.conf import settings
 from django.db.models import Q
 
@@ -353,7 +353,34 @@ def auth_password_reset(request):
             f"{reset_link}\n\n"
             "Se você não solicitou, ignore esta mensagem."
         )
-        send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
+
+        # Se houver configuração específica para e-mail de recuperação, use-a
+        recovery_host = getattr(settings, 'RECOVERY_EMAIL_HOST', None)
+        if recovery_host:
+            conn = get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=recovery_host,
+                port=getattr(settings, 'RECOVERY_EMAIL_PORT', getattr(settings, 'EMAIL_PORT', 587)),
+                username=getattr(settings, 'RECOVERY_EMAIL_HOST_USER', getattr(settings, 'EMAIL_HOST_USER', None)),
+                password=getattr(settings, 'RECOVERY_EMAIL_HOST_PASSWORD', getattr(settings, 'EMAIL_HOST_PASSWORD', None)),
+                use_tls=str(getattr(settings, 'RECOVERY_EMAIL_USE_TLS', getattr(settings, 'EMAIL_USE_TLS', False))).lower() in ('1', 'true', 'yes'),
+                fail_silently=False
+            )
+            from_email = getattr(settings, 'RECOVERY_DEFAULT_FROM_EMAIL', getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'))
+            try:
+                send_mail(subject, body, from_email, [user.email], fail_silently=False, connection=conn)
+            except Exception:
+                # Se houver falha com backend de recuperação, tentar enviar com DEFAULT
+                try:
+                    send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
+                except Exception as e:
+                    print('ERROR sending password reset email (both recovery and default):', repr(e))
+                    try:
+                        print('Password reset link (fallback):', reset_link)
+                    except:
+                        pass
+        else:
+            send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
     except Exception as e:
         # Não falhar a requisição por erro de envio; loga para diagnóstico
         print('ERROR sending password reset email:', repr(e))
