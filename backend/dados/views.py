@@ -92,6 +92,7 @@ import threading
 import time
 import os
 from django.conf import settings
+import urllib.request
 
 # (remoção de redefinição duplicada de DEFAULT_GET_PERMISSION)
 
@@ -342,8 +343,8 @@ def auth_password_reset(request):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         frontend_base = _get_frontend_base()
-        # Link padrão: frontend exibe página para confirmar token e definir nova senha
-        reset_link = f"{frontend_base}/recuperacao-senha?uid={uid}&token={token}"
+    # Link padrão: apontar para a página de confirmação específica (/recuperacao-senha/confirm)
+    reset_link = f"{frontend_base}/recuperacao-senha/confirm?uid={uid}&token={token}"
 
         subject = 'Recuperação de Senha'
         body = (
@@ -401,6 +402,19 @@ def auth_password_reset_confirm(request):
     except Exception as e:
         print('ERROR setting new password:', repr(e))
         return Response({'error': 'Falha ao alterar senha.'}, status=500)
+
+
+def outbound_ip(request):
+    """
+    Rota temporária para retornar o IP público de saída do servidor.
+    Uso: GET /api/_debug/outbound-ip/  (remover após uso)
+    """
+    try:
+        with urllib.request.urlopen('https://api.ipify.org', timeout=5) as resp:
+            ip = resp.read().decode().strip()
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'ip': ip})
 
 
 
