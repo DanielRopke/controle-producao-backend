@@ -11,7 +11,7 @@ Lê EMAIL_HOST_USER, EMAIL_HOST_PASSWORD e TEST_TO do ambiente.
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'novo.cadastro@controlesetup.com.br').strip().strip('"')
 RAW_PWD = os.getenv('EMAIL_HOST_PASSWORD', 'MD389wy7F83y')
 EMAIL_HOST_PASSWORD = RAW_PWD.strip().strip('"')
-TEST_TO = os.getenv('TEST_TO', 'daniel.duarte@gruposetup.com.br').strip()
+TEST_TO = os.getenv('TEST_TO', 'daniel.uarte@gruposetup.com.br').strip()
 
 print('user=', EMAIL_HOST_USER)
 print('pwd_len=', len(EMAIL_HOST_PASSWORD), 'pwd_repr=', repr(EMAIL_HOST_PASSWORD))
