@@ -127,6 +127,16 @@ export const api = {
     const res = await axios.post(`${API_BASE}/auth/resend-confirmation`, { email, timer_running })
     return res.data as { message: string }
   }
+  ,
+  requestPasswordReset: async (identifier: string) => {
+    const res = await axios.post(`${API_BASE}/auth/password-reset`, { identifier })
+    return res.data as { message: string }
+  }
+  ,
+  requestPasswordResetConfirm: async (uid: string, token: string, new_password: string) => {
+    const res = await axios.post(`${API_BASE}/auth/password-reset-confirm`, { uid, token, new_password })
+    return res.data as { message: string }
+  }
 }
 
 // ------------------ Agregação para Dashboard ------------------

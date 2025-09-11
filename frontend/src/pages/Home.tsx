@@ -1,10 +1,17 @@
 import { useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { FundoAnimado } from '../components/FundoAnimado'
 import imagemBotao from '../assets/obras.png'
 import logoSetup from '../assets/LogoSetup1.png'
 
 function Home() {
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const prev = document.title;
+    document.title = 'Grupo SETUP - Setores';
+    return () => { document.title = prev; };
+  }, []);
 
   const handleLogout = () => {
     navigate('/login')

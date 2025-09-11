@@ -24,4 +24,6 @@ urlpatterns = [
     path('auth/register', views.auth_register),
     path('auth/verify-email', views.auth_verify_email),
     path('auth/resend-confirmation', views.auth_resend_confirmation),
+    path('auth/password-reset', views.auth_password_reset),
+    path('auth/password-reset-confirm', views.auth_password_reset_confirm),
 ]

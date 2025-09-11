@@ -10,6 +10,7 @@ import Faturamento from './pages/Faturamento'
 import Login from './pages/Login'
 import Cadastro from './pages/Cadastro'
 import RecuperacaoSenha from './pages/RecuperacaoSenha'
+import ResetarSenha from './pages/ResetarSenha'
 import TestePagina from './pages/TestePagina'
 import TesteBotao from './pages/TesteBotao'
 import PrazosSAPSimples from './pages/PrazosSAPSimples'
@@ -33,6 +34,7 @@ function AppContent() {
   <Route path="/login" element={<Login />} />
   <Route path="/cadastro" element={<Cadastro />} />
   <Route path="/recuperacao-senha" element={<RecuperacaoSenha />} />
+  <Route path="/recuperacao-senha/confirm" element={<ResetarSenha />} />
 
       {/* RequireAuth protege as rotas abaixo e redireciona ao /login quando não autenticado */}
       <Route

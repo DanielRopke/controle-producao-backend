@@ -46,6 +46,9 @@ export default function Programacao() {
     data: string;
     pep: string; // PEP/ORDEM
     valorProgramado: number;
+    valorConcluido: number;
+    valorParcial: number;
+    valorCancelado: number;
     statusProg: string;
     motivoNaoCumprimento: string;
     motivoPrioridade: string;
@@ -59,15 +62,18 @@ export default function Programacao() {
   const [mesesList, setMesesList] = useState<string[]>([]);
 
   // Proporções das colunas em % do espaço disponível
-  type ColumnKey = 'data' | 'pep' | 'valorProgramado' | 'statusProg' | 'motivoNaoCumprimento' | 'motivoPrioridade' | 'hash';
+  type ColumnKey = 'data' | 'pep' | 'valorProgramado' | 'valorConcluido' | 'valorParcial' | 'valorCancelado' | 'statusProg' | 'motivoNaoCumprimento' | 'motivoPrioridade' | 'hash';
   const colPercents: Record<ColumnKey, number> = {
   data: 8,
-  pep: 18.63,
-  valorProgramado: 8,
-  statusProg: 12,
-  motivoNaoCumprimento: 38.45,
-  motivoPrioridade: 10.92,
-  hash: 4,
+  pep: 17, // reduzido em 42% (28% -> 16.24%)
+  valorProgramado: 9.5,
+  valorConcluido: 8.5,
+  valorParcial: 6.5,
+  valorCancelado: 8.5,
+  statusProg: 10.8,
+  motivoNaoCumprimento: 18, // recebeu o excedente para manter 100% total
+  motivoPrioridade: 8.5,
+  hash: 3.5,
   };
   const getPercent = (key: ColumnKey) => colPercents[key];
 
@@ -94,140 +100,123 @@ export default function Programacao() {
   const clearPepSearch = () => { setPepSearch(''); showToast('Pesquisa PEP limpa!'); };
 
   const handleSort = (key: keyof MatrixRow) => {
-    // se for a mesma coluna, alterna
-    if (sortConfig.key === key) {
-      setSortConfig({ key, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' });
-      return;
-    }
-    // primeira vez: numéricos e datas começam em 'desc' (maior → menor / mais novo → mais antigo)
-    const numericKeys: (keyof MatrixRow)[] = ['valorProgramado'];
-    if (numericKeys.includes(key) || key === 'data') {
-      setSortConfig({ key, direction: 'desc' });
-    } else {
-      setSortConfig({ key, direction: 'asc' });
-    }
-  };
+    // Dados calculados (mantém estrutura para matriz e filtros)
+    const filteredData = React.useMemo(() => {
+      const anyHasEner = rawRows.some(r => (r.statusEner || '').toString().trim());
+      const anyHasConc = rawRows.some(r => (r.statusConc || '').toString().trim());
+      const anyHasMotivos = rawRows.some(r => (r.statusServico || '').toString().trim());
 
-  const getSortIcon = (columnKey: keyof MatrixRow) => {
-    if (sortConfig.key !== columnKey) return <ChevronsUpDown className="w-4 h-4 text-gray-500" />;
-    return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 text-green-600" /> : <ChevronDown className="w-4 h-4 text-green-600" />;
-  };
+      const regionFilterForOthers = (activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : undefined)) as string | undefined;
+      let rowsForOthers = rawRows.slice();
+      if (regionFilterForOthers) rowsForOthers = rowsForOthers.filter(r => String(r.seccional || '').trim() === regionFilterForOthers);
 
-  // Ref para o wrapper da tabela (usado para rolamento automático)
-  const tableWrapperRef = useRef<HTMLDivElement | null>(null);
+      // Aplicar filtros selecionados localmente (usando colunas da aba 'programação')
+      if (selectedStatusSap) rowsForOthers = rowsForOthers.filter(r => String(r.statusSap || '').trim() === selectedStatusSap);
+      if (selectedTipo) rowsForOthers = rowsForOthers.filter(r => String(r.tipo || '').trim() === selectedTipo);
+      if (selectedMes) rowsForOthers = rowsForOthers.filter(r => String((r as unknown as Record<string, unknown>).anoCiclo ?? (r as unknown as Record<string, unknown>)['Ano ciclo'] ?? '').trim() === selectedMes);
+      if (activeFilters.statusENER && anyHasEner) rowsForOthers = rowsForOthers.filter(r => String(r.statusEner || '').trim() === activeFilters.statusENER);
+      if (activeFilters.statusCONC && anyHasConc) rowsForOthers = rowsForOthers.filter(r => String(r.statusConc || '').trim() === activeFilters.statusCONC);
+      if (activeFilters.reasons && anyHasMotivos) rowsForOthers = rowsForOthers.filter(r => String(r.statusServico || '').trim() === activeFilters.reasons);
+      if (pepSearch.trim()) rowsForOthers = rowsForOthers.filter(r => String(r.pep || '').toLowerCase().includes(pepSearch.toLowerCase()));
 
-  const scrollToRow = (idx: number) => {
-    try {
-      const container = tableWrapperRef.current;
-      let el: HTMLElement | null = null;
-      if (container) el = container.querySelector(`[data-row-index="${idx}"]`);
-      if (!el) el = document.querySelector(`[data-row-index="${idx}"]`);
-      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    } catch (err) { console.debug('scrollToRow error', err); }
-  };
+      // Mapear para as colunas da tabela
+      const tableRows: MatrixRow[] = rowsForOthers.map(r => {
+        const rowObj = r as unknown as Record<string, unknown>;
+        const parseMoney = (v: unknown) => {
+          if (v == null) return 0;
+          if (typeof v === 'number') return v;
+          const s = String(v);
+          const cleaned = s.replace(/R\$/i, '').replace(/\./g, '').replace(/,/g, '.').trim();
+          const n = parseFloat(cleaned);
+          return Number.isNaN(n) ? 0 : n;
+        };
+        return {
+          data: String(rowObj['DATA'] ?? rowObj['Data'] ?? rowObj['data'] ?? ''),
+          pep: String(rowObj['PEP/ORDEM'] ?? rowObj['PEP'] ?? rowObj['pep'] ?? ''),
+          valorProgramado: parseMoney(rowObj['Valor programado'] ?? rowObj['Valor Programado'] ?? rowObj['valorProgramado'] ?? rowObj['valor'] ?? 0),
+          valorConcluido: parseMoney(rowObj['Valor concluído'] ?? rowObj['Valor Concluído'] ?? rowObj['valorConcluido'] ?? 0),
+          valorParcial: parseMoney(rowObj['Valor parcial'] ?? rowObj['Valor Parcial'] ?? rowObj['valorParcial'] ?? 0),
+          valorCancelado: parseMoney(rowObj['Valor cancelado'] ?? rowObj['Valor Cancelado'] ?? rowObj['valorCancelado'] ?? 0),
+          statusProg: String(rowObj['STATUS RETORNO PROG 2'] ?? rowObj['STATUS RETORNO PROG'] ?? rowObj['statusSap'] ?? ''),
+          motivoNaoCumprimento: String(rowObj['MOTIVO NÃO CUMPRIMENTO DA PROG'] ?? rowObj['Motivo Não Cumprimento'] ?? rowObj['motivoNaoCumprimento'] ?? ''),
+          motivoPrioridade: String(rowObj['Motivo Prioridade'] ?? rowObj['motivoPrioridade'] ?? ''),
+          prioridade: String(rowObj['Prioridade'] ?? rowObj['prioridade'] ?? ''),
+        } as MatrixRow;
+      });
 
-  // Dados calculados (mantém estrutura para matriz e filtros)
-  const filteredData = React.useMemo(() => {
-    const anyHasEner = rawRows.some(r => (r.statusEner || '').trim());
-    const anyHasConc = rawRows.some(r => (r.statusConc || '').trim());
-    const anyHasMotivos = rawRows.some(r => (r.statusServico || '').trim());
-
-    const regionFilterForOthers = (activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : undefined)) as string | undefined;
-    let rowsForOthers = rawRows;
-    if (regionFilterForOthers) rowsForOthers = rowsForOthers.filter(r => (r.seccional || '').trim() === regionFilterForOthers);
-  // Aplicar filtros selecionados localmente (usando colunas da aba 'programação')
-    if (selectedStatusSap) rowsForOthers = rowsForOthers.filter(r => (r.statusSap || '').trim() === selectedStatusSap);
-    if (selectedTipo) rowsForOthers = rowsForOthers.filter(r => (r.tipo || '').trim() === selectedTipo);
-    if (selectedMes) rowsForOthers = rowsForOthers.filter(r => {
-      const rowObj = r as unknown as Record<string, unknown>;
-      return String(rowObj['anoCiclo'] ?? rowObj['Ano ciclo'] ?? '').trim() === selectedMes;
-    });
-    if (activeFilters.statusENER && anyHasEner) rowsForOthers = rowsForOthers.filter(r => (r.statusEner || '').trim() === activeFilters.statusENER);
-    if (activeFilters.statusCONC && anyHasConc) rowsForOthers = rowsForOthers.filter(r => (r.statusConc || '').trim() === activeFilters.statusCONC);
-    if (activeFilters.reasons && anyHasMotivos) rowsForOthers = rowsForOthers.filter(r => (r.statusServico || '').trim() === activeFilters.reasons);
-    if (pepSearch.trim()) rowsForOthers = rowsForOthers.filter(r => (r.pep || '').toLowerCase().includes(pepSearch.toLowerCase()));
-
-  // (Gráficos removidos nesta página) — não precisamos de agregações específicas aqui
-
-    // Para a matriz: mapear para as colunas solicitadas
-    let tableRows = rowsForOthers.map(r => {
-      const rowObj = r as unknown as Record<string, unknown>;
-      const parseMoney = (v: unknown) => {
-        if (v == null) return 0;
-        if (typeof v === 'number') return v;
-        const s = String(v);
-        const cleaned = s.replace(/R\$/i, '').replace(/\./g, '').replace(/,/g, '.').trim();
-        const n = parseFloat(cleaned);
-        return Number.isNaN(n) ? 0 : n;
-      };
-      return {
-        data: String(rowObj['DATA'] ?? rowObj['Data'] ?? ''),
-        pep: String(rowObj['PEP/ORDEM'] ?? rowObj['PEP'] ?? rowObj['pep'] ?? ''),
-        valorProgramado: parseMoney(rowObj['Valor programado'] ?? rowObj['Valor Programado'] ?? rowObj['valorProgramado'] ?? rowObj['valor'] ?? 0),
-        statusProg: String(rowObj['STATUS RETORNO PROG 2'] ?? rowObj['STATUS RETORNO PROG'] ?? rowObj['statusSap'] ?? ''),
-        motivoNaoCumprimento: String(rowObj['MOTIVO NÃO CUMPRIMENTO DA PROG'] ?? rowObj['Motivo Não Cumprimento'] ?? ''),
-        motivoPrioridade: String(rowObj['Motivo Prioridade'] ?? rowObj['motivoPrioridade'] ?? ''),
-        prioridade: String(rowObj['Prioridade'] ?? rowObj['prioridade'] ?? ''),
-      } as MatrixRow;
-    });
-
-    // Filtro de data (inclusivo) — mesma implementação de Faturamento
-    if (selectedStartDate || selectedEndDate) {
-      const start = selectedStartDate ? new Date(selectedStartDate) : undefined;
-      const end = selectedEndDate ? new Date(selectedEndDate) : undefined;
-      if (start) start.setHours(0, 0, 0, 0);
-      if (end) end.setHours(23, 59, 59, 999);
-      tableRows = tableRows.filter(r => {
-        const label = String(r.data || '').trim();
-        const t = (() => {
-          if (!label) return Number.NaN;
-          const m = label.match(/^(\d{1,2})[^\d](\d{1,2})[^\d](\d{2,4})$/);
+      // Filtro de data (inclusivo)
+      if (selectedStartDate || selectedEndDate) {
+        const startTs = selectedStartDate ? new Date(selectedStartDate).setHours(0,0,0,0) : Number.NEGATIVE_INFINITY;
+        const endTs = selectedEndDate ? new Date(selectedEndDate).setHours(23,59,59,999) : Number.POSITIVE_INFINITY;
+        const parseDateSimple = (s: string): number => {
+          if (!s) return Number.NaN;
+          const str = String(s).trim();
+          const m = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
           if (m) {
             const d = Number(m[1]);
             const mo = Number(m[2]) - 1;
             let y = Number(m[3]);
             if (y < 100) y += 2000;
             const dt = new Date(y, mo, d);
-            return dt.getTime();
+            if (!Number.isNaN(dt.getTime())) return dt.getTime();
           }
-          const ts = Date.parse(label);
-          return Number.isNaN(ts) ? Number.NaN : ts;
-        })();
-        if (Number.isNaN(t)) return false;
-        if (start && t < start.getTime()) return false;
-        if (end && t > end.getTime()) return false;
-        return true;
-      });
-    }
+          const t = Date.parse(str);
+          return Number.isNaN(t) ? Number.NaN : t;
+        };
+        // aplicar
+        const filtered = tableRows.filter(r => {
+          const ts = parseDateSimple(r.data || '');
+          if (Number.isNaN(ts)) return false;
+          return ts >= startTs && ts <= endTs;
+        });
+        // substituir
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        // assign filtered back to tableRows variable used below
+        // (create a shallow copy to keep typing consistent)
+        // @ts-ignore
+        tableRows.splice(0, tableRows.length, ...filtered);
+      }
 
-    // Ordenação
-    if (sortConfig.key) {
-      // Parser de data robusto: aceita dd/mm/yyyy, dd/mm/yy e separadores variados (/, -, .)
-      const parseDate = (s: string): number => {
-        if (!s) return Number.NaN;
-        const str = String(s).trim();
-        // dd{sep}mm{sep}yyyy ou dd{sep}mm{sep}yy
-        const m = str.match(/^(\d{1,2})[^\d](\d{1,2})[^\d](\d{2,4})$/);
-        if (m) {
-          const d = Number(m[1]);
-          const mo = Number(m[2]) - 1;
-          let y = Number(m[3]);
-          if (y < 100) y += 2000; // trata anos de 2 dígitos como 20xx
-          const dt = new Date(y, mo, d);
-          if (!Number.isNaN(dt.getTime())) return dt.getTime();
-        }
-        // fallback: tenta Date.parse
-        const t = Date.parse(str);
-        return Number.isNaN(t) ? Number.NaN : t;
-      };
+      // Ordenação
+      if (sortConfig.key) {
+        const parseDateForSort = (s: string): number => {
+          if (!s) return Number.NaN;
+          const str = String(s).trim();
+          const m = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+          if (m) {
+            const d = Number(m[1]); const mo = Number(m[2]) - 1; let y = Number(m[3]); if (y < 100) y += 2000; const dt = new Date(y, mo, d); if (!Number.isNaN(dt.getTime())) return dt.getTime();
+          }
+          const t = Date.parse(str); return Number.isNaN(t) ? Number.NaN : t;
+        };
+        tableRows.sort((a, b) => {
+          const key = sortConfig.key as keyof MatrixRow;
+          const dir = sortConfig.direction === 'asc' ? 1 : -1;
+          const aValue = a[key]; const bValue = b[key];
+          if (key === 'valorProgramado' || key === 'valorConcluido' || key === 'valorParcial' || key === 'valorCancelado') {
+            const an = Number(aValue); const bn = Number(bValue);
+            if (Number.isNaN(an) && Number.isNaN(bn)) return 0;
+            if (Number.isNaN(an)) return 1;
+            if (Number.isNaN(bn)) return -1;
+            return dir * (an - bn);
+          }
+          if (key === 'data') {
+            const da = parseDateForSort(String(aValue)); const db = parseDateForSort(String(bValue));
+            if (Number.isNaN(da) && Number.isNaN(db)) return 0;
+            if (Number.isNaN(da)) return 1;
+            if (Number.isNaN(db)) return -1;
+            return dir * (da - db);
+          }
+          const aStr = String(aValue || '').toLowerCase(); const bStr = String(bValue || '').toLowerCase(); if (aStr === bStr) return 0; return dir * (aStr < bStr ? -1 : 1);
+        });
+      }
 
-      tableRows = [...tableRows].sort((a, b) => {
-        const key = sortConfig.key! as keyof typeof tableRows[0];
+      return { matrix: tableRows } as { matrix: MatrixRow[] };
+    }, [rawRows, selectedRegion, activeFilters, pepSearch, sortConfig, selectedStatusSap, selectedTipo, selectedMes, selectedStartDate, selectedEndDate]);
         const dir = sortConfig.direction === 'asc' ? 1 : -1;
         const aValue = a[key];
         const bValue = b[key];
         // Campos numéricos
-          if (key === 'valorProgramado') {
+        if (key === 'valorProgramado' || key === 'valorConcluido' || key === 'valorParcial' || key === 'valorCancelado') {
           const an = Number(aValue);
           const bn = Number(bValue);
           const cmp = (Number.isNaN(an) ? 1 : Number.isNaN(bn) ? -1 : (an - bn));
@@ -255,7 +244,7 @@ export default function Programacao() {
     }
 
   return { matrix: tableRows } as { matrix: MatrixRow[] };
-  }, [rawRows, selectedRegion, activeFilters, pepSearch, sortConfig, selectedStatusSap, selectedTipo, selectedMes, selectedStartDate, selectedEndDate]);
+  }, [rawRows, selectedRegion, activeFilters, pepSearch, sortConfig, selectedStatusSap, selectedTipo, selectedMes]);
 
   // Handler de teclado para seleção/rolagem, reaproveitado da outra página
   useEffect(() => {
@@ -449,7 +438,7 @@ export default function Programacao() {
 
   // Exportar Excel
   const handleExportExcel = () => {
-  const worksheet = XLSX.utils.json_to_sheet(filteredData.matrix.map(row => ({ 'Data': row.data, 'Serviço': row.pep, 'Valor': row.valorProgramado, 'Status': row.statusProg, 'Motivo': row.motivoNaoCumprimento, 'Prioridade': row.motivoPrioridade, '#': getHashEmoji(row) })));
+  const worksheet = XLSX.utils.json_to_sheet(filteredData.matrix.map(row => ({ 'Data': row.data, 'Serviço': row.pep, 'Programado': row.valorProgramado, 'Concluido': row.valorConcluido, 'Parcial': row.valorParcial, 'Cancelado': row.valorCancelado, 'Status': row.statusProg, 'Motivo': row.motivoNaoCumprimento, 'Prioridade': row.motivoPrioridade, '#': getHashEmoji(row) })));
     const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, 'Programacao'); XLSX.writeFile(workbook, 'programacao.xlsx'); showToast('Arquivo Excel exportado com sucesso!');
   };
 
@@ -603,13 +592,16 @@ export default function Programacao() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-hidden" ref={tableWrapperRef}>
+              <div className="overflow-x-auto" ref={tableWrapperRef}>
                 <Table style={{ tableLayout: 'fixed' }}>
                   {/* Define larguras pelo colgroup para garantir aplicação consistente */}
                   <colgroup>
                     <col style={{ width: `${getPercent('data')}%` }} />
                     <col style={{ width: `${getPercent('pep')}%` }} />
                     <col style={{ width: `${getPercent('valorProgramado')}%` }} />
+                    <col style={{ width: `${getPercent('valorConcluido')}%` }} />
+                    <col style={{ width: `${getPercent('valorParcial')}%` }} />
+                    <col style={{ width: `${getPercent('valorCancelado')}%` }} />
                     <col style={{ width: `${getPercent('statusProg')}%` }} />
                     <col style={{ width: `${getPercent('motivoNaoCumprimento')}%` }} />
                     <col style={{ width: `${getPercent('motivoPrioridade')}%` }} />
@@ -617,10 +609,13 @@ export default function Programacao() {
                   </colgroup>
                   <TableHeader>
                     <TableRow className="bg-gray-50 hover:bg-gray-100">
-                        {([
+                      {([
                         { key: 'data', label: 'Data', sortable: true },
                         { key: 'pep', label: 'Serviços', sortable: true },
-                        { key: 'valorProgramado', label: 'Valor', sortable: true },
+                        { key: 'valorProgramado', label: 'Programado', sortable: true },
+                        { key: 'valorConcluido', label: 'Concluido', sortable: true },
+                        { key: 'valorParcial', label: 'Parcial', sortable: true },
+                        { key: 'valorCancelado', label: 'Cancelado', sortable: true },
                         { key: 'statusProg', label: 'Status', sortable: true },
                         { key: 'motivoNaoCumprimento', label: 'Motivo', sortable: true },
                         { key: 'motivoPrioridade', label: 'Prioridade', sortable: true },
@@ -663,35 +658,29 @@ export default function Programacao() {
                           { key: 'data' as ColumnKey },
                           { key: 'pep' as ColumnKey },
                           { key: 'valorProgramado' as ColumnKey },
+                          { key: 'valorConcluido' as ColumnKey },
+                          { key: 'valorParcial' as ColumnKey },
+                          { key: 'valorCancelado' as ColumnKey },
                           { key: 'statusProg' as ColumnKey },
                           { key: 'motivoNaoCumprimento' as ColumnKey },
                           { key: 'motivoPrioridade' as ColumnKey },
                           { key: 'hash' as ColumnKey },
                         ]).map(col => {
-                          const baseStyle: React.CSSProperties = { width: `${getPercent(col.key)}%`, minWidth: 0 };
+                          const style = { width: `${getPercent(col.key)}%`, minWidth: 0 } as React.CSSProperties;
                           let content: React.ReactNode = null;
                           let className = 'overflow-hidden text-sm truncate whitespace-nowrap text-ellipsis';
-                          const cellStyle = { ...baseStyle } as React.CSSProperties;
-                          if (col.key === 'data') { content = row.data; className = 'overflow-hidden font-mono text-sm whitespace-nowrap text-ellipsis'; }
-                          else if (col.key === 'pep') { content = row.pep; className = 'font-mono text-sm'; cellStyle.overflowWrap = 'break-word'; cellStyle.wordBreak = 'break-all'; }
-                          else if (col.key === 'valorProgramado') { content = row.valorProgramado.toLocaleString('pt-BR'); className = 'overflow-hidden text-sm text-right whitespace-nowrap text-ellipsis'; }
+                          if (col.key === 'data') { content = row.data; className = 'font-mono text-sm truncate'; }
+                          else if (col.key === 'pep') { content = row.pep; className = 'font-mono text-sm truncate'; }
+                          else if (col.key === 'valorProgramado') { content = row.valorProgramado.toLocaleString('pt-BR'); className = 'text-sm text-right truncate'; }
+                          else if (col.key === 'valorConcluido') { content = row.valorConcluido.toLocaleString('pt-BR'); className = 'text-sm text-right truncate'; }
+                          else if (col.key === 'valorParcial') { content = row.valorParcial.toLocaleString('pt-BR'); className = 'text-sm text-right truncate'; }
+                          else if (col.key === 'valorCancelado') { content = row.valorCancelado.toLocaleString('pt-BR'); className = 'text-sm text-right truncate'; }
                           else if (col.key === 'statusProg') { content = (<span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(row.statusProg)}`}>{row.statusProg}</span>); className = 'truncate'; }
-                          else if (col.key === 'motivoNaoCumprimento') {
-                            content = row.motivoNaoCumprimento;
-                            // truncar em uma única linha com reticências e garantir altura uniforme
-                            content = row.motivoNaoCumprimento;
-                            className = 'overflow-hidden text-sm whitespace-nowrap text-ellipsis';
-                            cellStyle.whiteSpace = 'nowrap';
-                            cellStyle.textOverflow = 'ellipsis';
-                            cellStyle.overflow = 'hidden';
-                            // limitar a altura da célula para manter linhas da matriz com altura uniforme
-                            cellStyle.maxHeight = '2.25rem';
-                            cellStyle.lineHeight = '1.5rem';
-                          }
+                          else if (col.key === 'motivoNaoCumprimento') { content = row.motivoNaoCumprimento; className = 'overflow-hidden text-sm truncate whitespace-nowrap text-ellipsis'; }
                           else if (col.key === 'motivoPrioridade') { content = row.motivoPrioridade; className = 'overflow-hidden text-sm truncate whitespace-nowrap text-ellipsis'; }
                           else if (col.key === 'hash') { content = getHashEmoji(row as unknown as Record<string, unknown>); className = 'text-center'; }
                           return (
-                            <TableCell key={col.key} className={className} style={cellStyle}>
+                            <TableCell key={col.key} className={className} style={style}>
                               {content}
                             </TableCell>
                           );

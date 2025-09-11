@@ -3,13 +3,28 @@ import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import { FundoAnimado } from '../components/FundoAnimado'
 import logoCadastro from '../assets/LogoSetup1.png'
+import { api } from '../services/api'
 
 export default function RecuperacaoSenha() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    toast.info('Recuperação: integração com backend a definir')
+    if (!usernameOrEmail.trim()) {
+      toast.error('Informe seu usuário ou e-mail')
+      return
+    }
+    toast.promise(
+      api.requestPasswordReset(usernameOrEmail.trim()),
+      {
+        loading: 'Enviando instruções...',
+        success: (data) => data?.message || 'Enviamos as instruções para o seu e-mail.',
+        error: (err) => {
+          // Formata mensagem de erro
+          try { return err?.response?.data?.error || err?.response?.data?.message || String(err) } catch { return 'Falha ao enviar. Tente novamente.' }
+        }
+      }
+    )
   }
 
   return (

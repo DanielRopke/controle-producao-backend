@@ -302,6 +302,108 @@ def auth_resend_confirmation(request):
 
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def auth_password_reset(request):
+    """
+    Gera token de recuperação e envia e-mail com link para redefinir senha.
+    Entrada: { identifier: string } onde identifier pode ser e-mail ou username.
+    Resposta: mensagem genérica (não revela existência do usuário).
+    """
+    data = request.data or {}
+    identifier = (data.get('identifier') or '').strip()
+
+    if not identifier:
+        return Response({'error': 'Informe o usuário ou e-mail.'}, status=400)
+
+    user = None
+    try:
+        if '@' in identifier:
+            user = User.objects.get(email__iexact=identifier)
+        else:
+            try:
+                user = User.objects.get(username__iexact=identifier)
+            except User.DoesNotExist:
+                # fallback: talvez o usuário tenha informado e-mail sem @ (pouco provável)
+                try:
+                    user = User.objects.get(email__iexact=identifier)
+                except User.DoesNotExist:
+                    user = None
+    except Exception:
+        user = None
+
+    # Sempre retornar mensagem genérica para evitar enumeração de usuários
+    msg = 'Se um usuário correspondente for encontrado, enviamos instruções para redefinir a senha.'
+
+    if not user:
+        return Response({'message': msg}, status=200)
+
+    try:
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        frontend_base = _get_frontend_base()
+        # Link padrão: frontend exibe página para confirmar token e definir nova senha
+        reset_link = f"{frontend_base}/recuperacao-senha?uid={uid}&token={token}"
+
+        subject = 'Recuperação de Senha'
+        body = (
+            "Olá,\n\n"
+            "Recebemos uma solicitação para redefinir sua senha. Acesse o link abaixo para criar uma nova senha:\n"
+            f"{reset_link}\n\n"
+            "Se você não solicitou, ignore esta mensagem."
+        )
+        send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
+    except Exception as e:
+        # Não falhar a requisição por erro de envio; loga para diagnóstico
+        print('ERROR sending password reset email:', repr(e))
+        try:
+            print('Password reset link (fallback):', reset_link)
+        except:
+            pass
+
+    return Response({'message': msg}, status=200)
+
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def auth_password_reset_confirm(request):
+    """
+    Confirma token e altera a senha do usuário.
+    Entrada: { uid: string, token: string, new_password: string }
+    """
+    data = request.data or {}
+    uidb64 = (data.get('uid') or '').strip()
+    token = (data.get('token') or '').strip()
+    new_password = data.get('new_password') or ''
+
+    if not uidb64 or not token or not new_password:
+        return Response({'error': 'Parâmetros insuficientes.'}, status=400)
+
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+    except Exception:
+        return Response({'error': 'Link inválido.'}, status=400)
+
+    if not default_token_generator.check_token(user, token):
+        return Response({'error': 'Token inválido ou expirado.'}, status=400)
+
+    # Validação mínima de força (mesma regra usada em registro)
+    pwd = new_password
+    if len(pwd) <= 8 or not any(c.islower() for c in pwd) or not any(c.isupper() for c in pwd) or pwd.isalnum():
+        return Response({'password': 'Senha fraca: mínimo 9 caracteres com maiúscula, minúscula e caractere especial.'}, status=400)
+
+    try:
+        user.set_password(pwd)
+        user.save()
+        return Response({'message': 'Senha alterada com sucesso.'}, status=200)
+    except Exception as e:
+        print('ERROR setting new password:', repr(e))
+        return Response({'error': 'Falha ao alterar senha.'}, status=500)
+
+
+
 
 
 @api_view(['GET'])
