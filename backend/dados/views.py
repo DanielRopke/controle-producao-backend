@@ -140,6 +140,8 @@ from django.utils.encoding import force_bytes
 from django.core.mail import send_mail, get_connection
 from django.conf import settings
 from django.db.models import Q
+import smtplib
+import socket
 
 User = get_user_model()
 
@@ -442,6 +444,66 @@ def outbound_ip(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'ip': ip})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def debug_test_smtp(request):
+    """
+    Endpoint temporário para testar conexão e autenticação SMTP tanto para as configurações
+    padrão (`EMAIL_*`) quanto para a conta de recuperação (`RECOVERY_*`).
+
+    Retorna JSON com { default: { ok, host, port, error? , from }, recovery: { ... } }
+    Não expõe senhas.
+    """
+    results = {}
+
+    # Helper para testar um servidor SMTP
+    def _test_smtp(host, port, username, password, use_tls):
+        try:
+            # abertura de socket com timeout para falhar rápido se inacessível
+            server = smtplib.SMTP(host=host, port=port, timeout=10)
+            server.ehlo()
+            if use_tls:
+                server.starttls()
+                server.ehlo()
+            if username and password:
+                server.login(username, password)
+            server.quit()
+            return {'ok': True}
+        except (smtplib.SMTPException, socket.error) as e:
+            return {'ok': False, 'error': str(e)}
+        except Exception as e:
+            return {'ok': False, 'error': str(e)}
+
+    # Teste padrão (EMAIL_*)
+    email_backend = getattr(settings, 'EMAIL_BACKEND', '')
+    if 'console.EmailBackend' in email_backend or not getattr(settings, 'EMAIL_HOST', None):
+        results['default'] = {'ok': False, 'note': 'EMAIL backend is console or EMAIL_HOST not configured'}
+    else:
+        host = getattr(settings, 'EMAIL_HOST', '')
+        port = int(getattr(settings, 'EMAIL_PORT', 587) or 587)
+        username = getattr(settings, 'EMAIL_HOST_USER', None)
+        password = getattr(settings, 'EMAIL_HOST_PASSWORD', None)
+        use_tls = bool(getattr(settings, 'EMAIL_USE_TLS', False))
+        r = _test_smtp(host, port, username, password, use_tls)
+        r.update({'host': host, 'port': port, 'from': getattr(settings, 'DEFAULT_FROM_EMAIL', None)})
+        results['default'] = r
+
+    # Teste de recuperação (RECOVERY_*)
+    if getattr(settings, 'RECOVERY_EMAIL_HOST', None):
+        host = getattr(settings, 'RECOVERY_EMAIL_HOST')
+        port = int(getattr(settings, 'RECOVERY_EMAIL_PORT', getattr(settings, 'EMAIL_PORT', 587)) or 587)
+        username = getattr(settings, 'RECOVERY_EMAIL_HOST_USER', None)
+        password = getattr(settings, 'RECOVERY_EMAIL_HOST_PASSWORD', None)
+        use_tls = bool(getattr(settings, 'RECOVERY_EMAIL_USE_TLS', False))
+        r = _test_smtp(host, port, username, password, use_tls)
+        r.update({'host': host, 'port': port, 'from': getattr(settings, 'RECOVERY_DEFAULT_FROM_EMAIL', None)})
+        results['recovery'] = r
+    else:
+        results['recovery'] = {'ok': False, 'note': 'No RECOVERY_EMAIL_HOST configured'}
+
+    return JsonResponse(results)
 
 
 @api_view(['POST'])

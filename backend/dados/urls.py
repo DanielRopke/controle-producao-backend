@@ -28,5 +28,6 @@ urlpatterns = [
     path('auth/password-reset-confirm', views.auth_password_reset_confirm),
     path('auth/check-email', views.auth_check_email),
     # debug: outbound ip (temporário)
+    path('_debug/test-smtp/', views.debug_test_smtp),
     path('_debug/outbound-ip/', views.outbound_ip),
 ]
