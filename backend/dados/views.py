@@ -207,9 +207,10 @@ def auth_register(request):
         except Exception as e:
             print('ERROR sending verification email (register-existing-inactive):', repr(e))
             print('Verification link (register-existing-inactive):', verify_link)
-        # Mensagem depende apenas do estado do timer no frontend
-        msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
-        return Response({'message': msg}, status=200)
+
+    # Mensagem depende apenas do estado do timer no frontend
+    msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
+    return Response({'message': msg}, status=200)
 
     # Caso 3: não existe -> criar e enviar
     ser = RegisterSerializer(data=data)
@@ -233,8 +234,8 @@ def auth_register(request):
     except Exception as e:
         print('ERROR sending verification email (register-new):', repr(e))
         print('Verification link (register-new):', verify_link)
-    # Sempre retornar 201 no caminho de criação, independente do envio
-    return Response({'message': 'Email de Confirmação de Cadastro Enviado'}, status=201)
+
+        return Response({'message': 'Email de Confirmação de Cadastro Enviado'}, status=201)
 
 
 @api_view(['POST'])
@@ -503,6 +504,47 @@ def debug_test_smtp(request):
         results['recovery'] = {'ok': False, 'note': 'No RECOVERY_EMAIL_HOST configured'}
 
     return JsonResponse(results)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def debug_send_test_email(request):
+    """
+    Envia um e-mail de teste usando as configurações padrão (EMAIL_*/DEFAULT_FROM_EMAIL)
+    a partir do backend em produção (Render), protegido por TEST_EMAIL_SECRET.
+
+    Body esperado: { "to": "destino@dominio.com", "secret": "<TEST_EMAIL_SECRET>" }
+    Opcional: { "subject": "...", "body": "..." }
+    """
+    try:
+        data = request.data or {}
+    except Exception:
+        import json
+        try:
+            data = json.loads(request.body.decode('utf-8')) if request.body else {}
+        except Exception:
+            data = {}
+
+    provided = str(data.get('secret') or '').strip()
+    expected = os.getenv('TEST_EMAIL_SECRET') or getattr(settings, 'TEST_EMAIL_SECRET', None) or ''
+    if not expected or provided != expected:
+        return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=403)
+
+    to = str(data.get('to') or '').strip()
+    if not to:
+        return JsonResponse({'ok': False, 'error': 'missing to'}, status=400)
+
+    subject = str(data.get('subject') or 'Teste de envio (DEFAULT_FROM_EMAIL)').strip()
+    body = str(data.get('body') or 'Este é um e-mail de teste enviado pelo backend via SMTP padrão.').strip()
+
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None) or getattr(settings, 'EMAIL_HOST_USER', None) or 'no-reply@controlesetup.com.br'
+
+    try:
+        # Usa o backend padrão configurado (EMAIL_*)
+        send_mail(subject, body, from_email, [to], fail_silently=False)
+        return JsonResponse({'ok': True, 'from': from_email, 'to': to, 'host': getattr(settings, 'EMAIL_HOST', None), 'port': getattr(settings, 'EMAIL_PORT', None)})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e), 'from': from_email, 'to': to}, status=500)
 
 
 @api_view(['POST'])
