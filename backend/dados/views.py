@@ -145,6 +145,18 @@ import socket
 
 User = get_user_model()
 
+def _send_mail_async(subject, body, from_email, recipient_list, connection=None):
+    def _runner():
+        try:
+            if connection is not None:
+                send_mail(subject, body, from_email, recipient_list, fail_silently=False, connection=connection)
+            else:
+                send_mail(subject, body, from_email, recipient_list, fail_silently=False)
+        except Exception as e:
+            print('ERROR sending email (async):', repr(e))
+    t = threading.Thread(target=_runner, daemon=True)
+    t.start()
+
 
 @api_view(['GET'])
 def exemplo(request):
@@ -178,7 +190,6 @@ def auth_register(request):
         existing = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
         existing = None
-
     if existing:
         if existing.is_active:
             # Caso 1: usuário ativo -> bloquear
@@ -196,17 +207,7 @@ def auth_register(request):
             f"{verify_link}\n\n"
             "Se não foi você, ignore esta mensagem."
         )
-        try:
-            send_mail(
-                subject,
-                body,
-                getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'),
-                [existing.email],
-                fail_silently=False,
-            )
-        except Exception as e:
-            print('ERROR sending verification email (register-existing-inactive):', repr(e))
-            print('Verification link (register-existing-inactive):', verify_link)
+        _send_mail_async(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [existing.email])
         # Mensagem depende apenas do estado do timer no frontend
         msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
         return Response({'message': msg}, status=200)
@@ -228,12 +229,7 @@ def auth_register(request):
         f"{verify_link}\n\n"
         "Se não foi você, ignore esta mensagem."
     )
-    try:
-        send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email], fail_silently=False)
-    except Exception as e:
-        print('ERROR sending verification email (register-new):', repr(e))
-        print('Verification link (register-new):', verify_link)
-
+    _send_mail_async(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [user.email])
     return Response({'message': 'Email de Confirmação de Cadastro Enviado'}, status=201)
 
 
@@ -509,11 +505,18 @@ def debug_test_smtp(request):
 @permission_classes([AllowAny])
 def debug_send_test_email(request):
     """
-    Envia um e-mail de teste usando as configurações padrão (EMAIL_*/DEFAULT_FROM_EMAIL)
-    a partir do backend em produção (Render), protegido por TEST_EMAIL_SECRET.
+    Envia um e-mail de teste protegido por TEST_EMAIL_SECRET.
 
-    Body esperado: { "to": "destino@dominio.com", "secret": "<TEST_EMAIL_SECRET>" }
-    Opcional: { "subject": "...", "body": "..." }
+    Body esperado:
+      {
+        "to": "destino@dominio.com" | ["a@b.com","c@d.com"],
+        "cc": ["opcional@dominio.com"],
+        "bcc": ["opcional@dominio.com"],
+        "subject": "Opcional",
+        "body": "Opcional",
+        "use_recovery": false,   # se true, usa RECOVERY_* (recuperação)
+        "secret": "<TEST_EMAIL_SECRET>"
+      }
     """
     try:
         data = request.data or {}
@@ -529,21 +532,66 @@ def debug_send_test_email(request):
     if not expected or provided != expected:
         return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=403)
 
-    to = str(data.get('to') or '').strip()
-    if not to:
+    # Normaliza listas de destinatários
+    def _to_list(v):
+        if v is None:
+            return []
+        if isinstance(v, (list, tuple)):
+            return [str(x).strip() for x in v if str(x).strip()]
+        s = str(v).strip()
+        if not s:
+            return []
+        if ',' in s:
+            return [p.strip() for p in s.split(',') if p.strip()]
+        return [s]
+
+    to_list = _to_list(data.get('to'))
+    cc_list = _to_list(data.get('cc'))
+    bcc_list = _to_list(data.get('bcc'))
+    if not to_list:
         return JsonResponse({'ok': False, 'error': 'missing to'}, status=400)
 
-    subject = str(data.get('subject') or 'Teste de envio (DEFAULT_FROM_EMAIL)').strip()
-    body = str(data.get('body') or 'Este é um e-mail de teste enviado pelo backend via SMTP padrão.').strip()
+    subject = str(data.get('subject') or 'Teste de envio').strip()
+    body = str(data.get('body') or 'Este é um e-mail de teste enviado pelo backend.').strip()
+    use_recovery = bool(data.get('use_recovery'))
 
-    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None) or getattr(settings, 'EMAIL_HOST_USER', None) or 'no-reply@controlesetup.com.br'
-
+    # Seleciona conexão e remetente conforme flag
+    connection = None
+    from_email = None
+    meta = {}
     try:
-        # Usa o backend padrão configurado (EMAIL_*)
-        send_mail(subject, body, from_email, [to], fail_silently=False)
-        return JsonResponse({'ok': True, 'from': from_email, 'to': to, 'host': getattr(settings, 'EMAIL_HOST', None), 'port': getattr(settings, 'EMAIL_PORT', None)})
+        if use_recovery and getattr(settings, 'RECOVERY_EMAIL_HOST', None):
+            connection = get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=getattr(settings, 'RECOVERY_EMAIL_HOST'),
+                port=getattr(settings, 'RECOVERY_EMAIL_PORT', getattr(settings, 'EMAIL_PORT', 587)),
+                username=getattr(settings, 'RECOVERY_EMAIL_HOST_USER', getattr(settings, 'EMAIL_HOST_USER', None)),
+                password=getattr(settings, 'RECOVERY_EMAIL_HOST_PASSWORD', getattr(settings, 'EMAIL_HOST_PASSWORD', None)),
+                use_tls=bool(getattr(settings, 'RECOVERY_EMAIL_USE_TLS', getattr(settings, 'EMAIL_USE_TLS', False))),
+                fail_silently=False,
+            )
+            from_email = getattr(settings, 'RECOVERY_DEFAULT_FROM_EMAIL', None) or getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+            meta = {
+                'mode': 'recovery',
+                'host': getattr(settings, 'RECOVERY_EMAIL_HOST', None),
+                'port': getattr(settings, 'RECOVERY_EMAIL_PORT', None),
+            }
+        else:
+            # Usa backend padrão
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None) or getattr(settings, 'EMAIL_HOST_USER', None) or 'no-reply@controlesetup.com.br'
+            meta = {
+                'mode': 'default',
+                'host': getattr(settings, 'EMAIL_HOST', None),
+                'port': getattr(settings, 'EMAIL_PORT', None),
+            }
+
+        # Usa EmailMessage para suportar cc/bcc
+        from django.core.mail import EmailMessage
+        msg = EmailMessage(subject=subject, body=body, from_email=from_email, to=to_list, cc=cc_list or None, bcc=bcc_list or None, connection=connection)
+        msg.send(fail_silently=False)
+        return JsonResponse({'ok': True, 'from': from_email, 'to': to_list, 'cc': cc_list, 'bcc': bcc_list, **meta})
     except Exception as e:
-        return JsonResponse({'ok': False, 'error': str(e), 'from': from_email, 'to': to}, status=500)
+        return JsonResponse({'ok': False, 'error': str(e), 'from': from_email, 'to': to_list, **meta}, status=500)
 
 
 @api_view(['POST'])

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import { FundoAnimado } from '../components/FundoAnimado'
@@ -7,6 +7,10 @@ import { api } from '../services/api'
 
 export default function RecuperacaoSenha() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('')
+
+  useEffect(() => {
+    document.title = 'Recuperação de Senha'
+  }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
