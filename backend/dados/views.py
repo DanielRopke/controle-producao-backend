@@ -207,10 +207,9 @@ def auth_register(request):
         except Exception as e:
             print('ERROR sending verification email (register-existing-inactive):', repr(e))
             print('Verification link (register-existing-inactive):', verify_link)
-
-    # Mensagem depende apenas do estado do timer no frontend
-    msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
-    return Response({'message': msg}, status=200)
+        # Mensagem depende apenas do estado do timer no frontend
+        msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
+        return Response({'message': msg}, status=200)
 
     # Caso 3: não existe -> criar e enviar
     ser = RegisterSerializer(data=data)
@@ -235,7 +234,7 @@ def auth_register(request):
         print('ERROR sending verification email (register-new):', repr(e))
         print('Verification link (register-new):', verify_link)
 
-        return Response({'message': 'Email de Confirmação de Cadastro Enviado'}, status=201)
+    return Response({'message': 'Email de Confirmação de Cadastro Enviado'}, status=201)
 
 
 @api_view(['POST'])
