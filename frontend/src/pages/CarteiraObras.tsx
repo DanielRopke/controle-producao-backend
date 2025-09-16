@@ -925,19 +925,19 @@ export default function CarteiraObras() {
 								<CardContent className="p-4">
 									<ChartContainer config={{ value: { label: "R$", color: "hsl(var(--primary))" } }} className="h-64 sm:h-72 md:h-80 lg:h-[calc((100vh-20rem)/2)] lg:max-h-[350px] w-full">
 										<ResponsiveContainer width="100%" height="100%">
-											<BarChart data={emAndamentoData} margin={{ top: 20, right: 20, bottom: 50, left: 20 }} barGap={6} barCategoryGap={16}>
+											<BarChart data={emAndamentoData} margin={{ top: 20, right: 10, bottom: 70, left: 10 }} barGap={6} barCategoryGap={16}>
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-												<XAxis dataKey="name" fontSize={12} tickMargin={8} tick={(props: unknown) => {
+												<XAxis dataKey="name" fontSize={12} tickMargin={8} interval={0} tick={(props: unknown) => {
 													const p = props as ChartTickProps;
 													const value = p && p.payload ? p.payload.value : '';
 													return (
 														<g transform={`translate(${p.x},${p.y})`} style={{ cursor: 'pointer' }} onClick={() => handleChartClick('statusENER', String(value))}>
-															<text x={0} y={0} dy={16} textAnchor="middle" fontSize={12} fill="currentColor">{String(value)}</text>
+															<text transform="rotate(-25)" x={0} y={0} dy={14} textAnchor="end" fontSize={12} fill="currentColor">{String(value)}</text>
 														</g>
 													);
 												}} />
-												<YAxis yAxisId="left" fontSize={12} label={{ value: 'PEP', angle: -90, position: 'insideLeft' }} />
-												<YAxis yAxisId="right" orientation="right" fontSize={12} label={{ value: 'R$', angle: 90, position: 'insideRight' }} />
+												<YAxis yAxisId="left" hide />
+												<YAxis yAxisId="right" orientation="right" hide />
 												<Tooltip
 													contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }}
 													formatter={(value, _name, item) => {
@@ -1000,19 +1000,19 @@ export default function CarteiraObras() {
 								<CardContent className="p-4">
 									<ChartContainer config={{ value: { label: "R$", color: "hsl(var(--primary))" } }} className="h-64 sm:h-72 md:h-80 lg:h-[calc((100vh-20rem)/2)] lg:max-h-[350px] w-full">
 										<ResponsiveContainer width="100%" height="100%">
-											<BarChart data={concluidasData} margin={{ top: 20, right: 20, bottom: 50, left: 20 }} barGap={6} barCategoryGap={16}>
+											<BarChart data={concluidasData} margin={{ top: 20, right: 10, bottom: 70, left: 10 }} barGap={6} barCategoryGap={16}>
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-												<XAxis dataKey="name" fontSize={12} tickMargin={8} tick={(props: unknown) => {
+												<XAxis dataKey="name" fontSize={12} tickMargin={8} interval={0} tick={(props: unknown) => {
 													const p = props as ChartTickProps;
 													const value = p && p.payload ? p.payload.value : '';
 													return (
 														<g transform={`translate(${p.x},${p.y})`} style={{ cursor: 'pointer' }} onClick={() => handleChartClick('comparison', String(value))}>
-															<text x={0} y={0} dy={16} textAnchor="middle" fontSize={12} fill="currentColor">{String(value)}</text>
+															<text transform="rotate(-25)" x={0} y={0} dy={14} textAnchor="end" fontSize={12} fill="currentColor">{String(value)}</text>
 														</g>
 													);
 												}} />
-												<YAxis yAxisId="left" fontSize={12} label={{ value: 'PEP', angle: -90, position: 'insideLeft' }} />
-												<YAxis yAxisId="right" orientation="right" fontSize={12} label={{ value: 'R$', angle: 90, position: 'insideRight' }} />
+												<YAxis yAxisId="left" hide />
+												<YAxis yAxisId="right" orientation="right" hide />
 												<Tooltip
 													contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }}
 													formatter={(value, _name, item) => {
@@ -1075,19 +1075,19 @@ export default function CarteiraObras() {
 								<CardContent className="p-4">
 									<ChartContainer config={{ value: { label: "R$", color: "hsl(var(--primary))" } }} className="h-64 sm:h-72 md:h-80 lg:h-[calc((100vh-20rem)/2)] lg:max-h-[350px] w-full">
 										<ResponsiveContainer width="100%" height="100%">
-											<BarChart data={paradasData} margin={{ top: 20, right: 20, bottom: 50, left: 20 }} barGap={6} barCategoryGap={16}>
+											<BarChart data={paradasData} margin={{ top: 20, right: 10, bottom: 70, left: 10 }} barGap={6} barCategoryGap={16}>
 												<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-												<XAxis dataKey="name" fontSize={12} tickMargin={8} tick={(props: unknown) => {
+												<XAxis dataKey="name" fontSize={12} tickMargin={8} interval={0} tick={(props: unknown) => {
 													const p = props as ChartTickProps;
 													const value = p && p.payload ? p.payload.value : '';
 													return (
 														<g transform={`translate(${p.x},${p.y})`} style={{ cursor: 'pointer' }} onClick={() => handleChartClick('statusCONC', String(value))}>
-															<text x={0} y={0} dy={16} textAnchor="middle" fontSize={12} fill="currentColor">{String(value)}</text>
+															<text transform="rotate(-25)" x={0} y={0} dy={14} textAnchor="end" fontSize={12} fill="currentColor">{String(value)}</text>
 														</g>
 													);
 												}} />
-												<YAxis yAxisId="left" fontSize={12} label={{ value: 'PEP', angle: -90, position: 'insideLeft' }} />
-												<YAxis yAxisId="right" orientation="right" fontSize={12} label={{ value: 'R$', angle: 90, position: 'insideRight' }} />
+												<YAxis yAxisId="left" hide />
+												<YAxis yAxisId="right" orientation="right" hide />
 												<Tooltip
 													contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }}
 													formatter={(value, _name, item) => {
@@ -1150,19 +1150,19 @@ export default function CarteiraObras() {
 									<CardContent className="p-4">
 										<ChartContainer config={{ value: { label: "R$", color: "hsl(var(--primary))" } }} className="h-64 sm:h-72 md:h-80 lg:h-[calc((100vh-20rem)/2)] lg:max-h-[350px] w-full">
 											<ResponsiveContainer width="100%" height="100%">
-												<BarChart data={filteredData.comparison} margin={{ top: 20, right: 15, bottom: 50, left: 15 }} barGap={6} barCategoryGap={10}>
+												<BarChart data={filteredData.comparison} margin={{ top: 20, right: 10, bottom: 70, left: 10 }} barGap={6} barCategoryGap={10}>
 													<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
 													<XAxis dataKey="name" fontSize={12} tickMargin={8} interval={0} minTickGap={0} tick={(props: unknown) => {
 														const p = props as ChartTickProps;
 														const value = p && p.payload ? p.payload.value : '';
 														return (
 															<g transform={`translate(${p.x},${p.y})`} style={{ cursor: 'pointer' }} onClick={() => handleChartClick('comparison', String(value))}>
-																<text x={0} y={0} dy={16} textAnchor="middle" fontSize={12} fill="currentColor">{String(value)}</text>
+																<text transform="rotate(-25)" x={0} y={0} dy={14} textAnchor="end" fontSize={12} fill="currentColor">{String(value)}</text>
 															</g>
 														);
 													}} />
-													<YAxis yAxisId="left" fontSize={12} label={{ value: 'PEP', angle: -90, position: 'insideLeft' }} />
-													<YAxis yAxisId="right" orientation="right" fontSize={12} label={{ value: 'R$', angle: 90, position: 'insideRight' }} />
+													<YAxis yAxisId="left" hide />
+													<YAxis yAxisId="right" orientation="right" hide />
 													<Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: 'var(--shadow-elegant)' }} formatter={(value, _name, item) => {
 														const num = typeof value === 'number' ? value : Number(value) || 0;
 														type TP = { dataKey?: string | number } | undefined;
