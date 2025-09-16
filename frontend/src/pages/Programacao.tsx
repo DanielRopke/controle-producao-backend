@@ -470,7 +470,22 @@ export default function Programacao() {
     return '';
   };
 
-  const totalValue = React.useMemo(() => filteredData.matrix.reduce((sum, row) => sum + (row.valorProgramado || 0), 0), [filteredData.matrix]);
+  // Soma do Valor Total: somar cada serviço (pep) apenas uma vez.
+  // Se existirem várias linhas com o mesmo pep, usamos o maior valorProgramado entre elas
+  // para representar o valor real necessário. Respeita todos os filtros aplicados (usa filteredData.matrix).
+  const totalValue = React.useMemo(() => {
+    const byPep = new Map<string, number>();
+    for (const row of filteredData.matrix) {
+      const pep = String(row.pep || '').trim();
+      if (!pep) continue;
+      const v = Number(row.valorProgramado || 0);
+      const prev = byPep.get(pep);
+      if (prev === undefined || v > prev) byPep.set(pep, v);
+    }
+    let sum = 0;
+    for (const v of byPep.values()) sum += v;
+    return sum;
+  }, [filteredData.matrix]);
   const totalPep = React.useMemo(() => {
     const unique = new Set<string>();
     for (const row of filteredData.matrix) {

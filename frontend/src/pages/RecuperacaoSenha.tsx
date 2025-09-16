@@ -48,15 +48,15 @@ export default function RecuperacaoSenha() {
           <div className="space-y-1">
             <label className="text-sm text-gray-700">Usuário ou E-mail</label>
             <input
-              className="w-full border rounded px-3 py-2"
+              className="w-full px-3 py-2 border rounded"
               value={usernameOrEmail}
               onChange={(e)=>setUsernameOrEmail(e.target.value)}
               placeholder="Digite seu usuário ou e-mail"
             />
           </div>
-          <button type="submit" className="w-full bg-emerald-600 text-white rounded py-2">Enviar</button>
+          <button type="submit" className="w-full py-2 text-white rounded bg-emerald-600">Enviar</button>
         </form>
-        <Link to="/login" className="block text-center text-sm text-emerald-700 hover:underline">Voltar ao Login</Link>
+        <Link to="/login" className="block text-sm text-center text-emerald-700 hover:underline">Voltar ao Login</Link>
       </div>
     </div>
   )

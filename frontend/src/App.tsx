@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 // Import das páginas essenciais para este fluxo
 import PrazosSAP from './pages/PrazosSAP'
 import Obras from './pages/Obras'
+import CarteiraObras from './pages/CarteiraObras'
 import Programacao from './pages/Programacao'
 import Faturamento from './pages/Faturamento'
 import Login from './pages/Login'
@@ -49,6 +50,7 @@ function AppContent() {
         <Route path="/prazos-sap1" element={<PrazosSAP />} />
         <Route path="/prazos-sap-1" element={<PrazosSAP />} />
         <Route path="/prazos-sap" element={<PrazosSAP />} />
+  <Route path="/carteira-obras" element={<CarteiraObras />} />
         <Route path="/teste" element={<TestePagina />} />
   <Route path="/programacao" element={<Programacao />} />
   <Route path="/faturamento" element={<Faturamento />} />

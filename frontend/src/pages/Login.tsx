@@ -12,7 +12,7 @@ export default function Login() {
 
   useEffect(() => {
     const prev = document.title;
-    document.title = 'Controle - Grupo SETUP';
+    document.title = 'Controle / GRUPO SETUP';
     return () => { document.title = prev; };
   }, []);
 
@@ -50,7 +50,7 @@ export default function Login() {
 
   return (
     <div
-      className="relative min-h-screen w-screen bg-cover bg-center bg-no-repeat"
+      className="relative w-screen min-h-screen bg-center bg-no-repeat bg-cover"
       style={{
         backgroundImage: "url('/imagens/grupo_setup.png')",
         overflowY: 'hidden', // ✅ Desativa rolagem vertical
@@ -58,7 +58,7 @@ export default function Login() {
       }}
     >
       {/* Overlay escuro para contraste */}
-      <div className="absolute inset-0 bg-black opacity-50 z-0" />
+      <div className="absolute inset-0 z-0 bg-black opacity-50" />
 
       {/* Logo + textos "GRUPO" e "Setup", reduzido em 30% */}
       <div
@@ -70,8 +70,8 @@ export default function Login() {
           transformOrigin: 'top left',
         }}
       >
-        <img src={logo} alt="Logo" className="w-36 h-auto" />
-        <div className="flex flex-col justify-end leading-none ml-2">
+        <img src={logo} alt="Logo" className="h-auto w-36" />
+        <div className="flex flex-col justify-end ml-2 leading-none">
           <span
             style={{
               color: 'white',
@@ -98,7 +98,7 @@ export default function Login() {
 
       {/* Formulário centralizado na tela */}
       <div
-        className="absolute z-10 p-6 rounded-xl shadow-xl flex flex-col items-center"
+        className="absolute z-10 flex flex-col items-center p-6 shadow-xl rounded-xl"
         style={{
           top: '75%',
           left: '50%',
@@ -112,7 +112,7 @@ export default function Login() {
           <div className="flex flex-col mb-4 w-[200px]">
             <label
               htmlFor="usuario"
-              className="font-medium text-sm mb-1"
+              className="mb-1 text-sm font-medium"
               style={{ color: 'white', backgroundColor: 'transparent' }}
             >
               Usuário:
@@ -123,7 +123,7 @@ export default function Login() {
               value={usuario}
               onChange={(e) => setUsuario(e.target.value)}
               placeholder="Digite seu Usuário"
-              className="p-2 rounded border border-gray-300 text-center text-black"
+              className="p-2 text-center text-black border border-gray-300 rounded"
               required
             />
           </div>
@@ -132,7 +132,7 @@ export default function Login() {
           <div className="flex flex-col mb-4 w-[200px]">
             <label
               htmlFor="senha"
-              className="font-medium text-sm mb-1"
+              className="mb-1 text-sm font-medium"
               style={{ color: 'white', backgroundColor: 'transparent' }}
             >
               Senha:
@@ -144,14 +144,14 @@ export default function Login() {
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder="Digite sua Senha"
-                className="p-2 pr-10 rounded border border-gray-300 text-center text-black w-full"
+                className="w-full p-2 pr-10 text-center text-black border border-gray-300 rounded"
                 required
                 aria-label="Senha"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+                className="absolute p-1 text-gray-700 -translate-y-1/2 bg-white border border-gray-300 rounded right-2 top-1/2 hover:bg-gray-100"
                 aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -164,7 +164,7 @@ export default function Login() {
             <button
               type="submit"
               style={{ backgroundColor: '#047857', color: 'white' }}
-              className="w-full p-2 font-bold rounded transition"
+              className="w-full p-2 font-bold transition rounded"
             >
               Entrar
             </button>
@@ -174,13 +174,13 @@ export default function Login() {
         <div className="w-[200px] flex items-center justify-between gap-2 mt-2">
           <Link
             to="/cadastro"
-            className="flex-1 text-center text-sm py-2 rounded border border-white/60 text-white hover:bg-white/10 transition"
+            className="flex-1 py-2 text-sm text-center text-white transition border rounded border-white/60 hover:bg-white/10"
           >
             Novo Cadastro
           </Link>
           <Link
             to="/recuperacao-senha"
-            className="flex-1 text-center text-sm py-2 rounded border border-white/60 text-white hover:bg-white/10 transition"
+            className="flex-1 py-2 text-sm text-center text-white transition border rounded border-white/60 hover:bg-white/10"
           >
             Esqueci a Senha
           </Link>

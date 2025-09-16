@@ -209,7 +209,7 @@ def auth_register(request):
         )
         _send_mail_async(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@controlesetup.com.br'), [existing.email])
         # Mensagem depende apenas do estado do timer no frontend
-        msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
+    msg = 'Aguarde o tempo para Reenvio de Email' if timer_running else 'Email de Confirmação Reenviado'
         return Response({'message': msg}, status=200)
 
     # Caso 3: não existe -> criar e enviar
@@ -295,7 +295,7 @@ def auth_resend_confirmation(request):
         print('ERROR sending verification email (resend):', repr(e))
         print('Verification link (resend):', verify_link)
 
-    msg = 'Email de Confirmação Já Enviado' if timer_running else 'Email de Confirmação Reenviado'
+    msg = 'Aguarde o tempo para Reenvio de Email' if timer_running else 'Email de Confirmação Reenviado'
     return Response({'message': msg}, status=200)
 
 

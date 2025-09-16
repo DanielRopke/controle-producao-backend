@@ -98,7 +98,7 @@ function Obras() {
     { label: 'Pareto Manutenção', to: '/pareto-manutencao', img: paretoImg, desc: 'Análise de Pareto para manutenção', soon: true },
     { label: 'GA/QLP/ Equipamentos', to: '/ga-qlp', img: gaqlpImg, desc: 'Gestão de equipamentos e qualidade', soon: true },
   { label: 'KPI Manutenção', to: '/kpi-manutencao', img: kpiImg, desc: 'Indicadores de performance de manutenção', soon: true },
-    { label: 'Carteira de Obras', to: '/carteira-obras', img: carteiraImg, desc: 'Gestão da carteira de obras', soon: true },
+  { label: 'Carteira de Obras', to: '/carteira-obras', img: carteiraImg, desc: 'Gestão da carteira de obras' },
     { label: 'Prioridade Obras', to: '/prioridade-obras', img: prioridadeImg, desc: 'Definição de prioridades de obras', soon: true },
     { label: 'Mapa', to: '/mapa', img: mapaImg, desc: 'Visualização geográfica de obras', soon: true },
     { label: 'Defeitos Progeo', to: '/defeitos-progeo', img: defeitosImg, desc: 'Gestão de defeitos do sistema Progeo', soon: true },
