@@ -13,9 +13,8 @@ import * as XLSX from 'xlsx';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { PEPSearch } from '../components/PEPSearch';
 import { cn } from "../lib/utils";
-import useGoogleSheetCarteira from '../hooks/useGoogleSheetCarteira';
 import type { MatrizItem } from '../services/api';
-import { getMatrizDados, getCarteiraObras } from '../services/api';
+import { getCarteiraObras } from '../services/api';
 import { showToast } from '../components/toast';
 import LogoSetup from '../assets/LogoSetup1.png';
 import { FundoAnimado } from '../components/FundoAnimado';
@@ -73,9 +72,9 @@ export default function CarteiraObras() {
 	const [sortConfig, setSortConfig] = useState<{ key?: keyof DashboardData['matrix'][0]; direction?: 'asc' | 'desc' }>({});
 	const [regions, setRegions] = useState<string[]>([]);
 	const [rawRows, setRawRows] = useState<MatrizItem[]>([]);
-	const [statusEnerMap, setStatusEnerMap] = useState<Record<string, Record<string, number>>>({});
-	const [statusConcMap, setStatusConcMap] = useState<Record<string, Record<string, number>>>({});
-	const [reasonsMap, setReasonsMap] = useState<Record<string, Record<string, number>>>({});
+	const [statusEnerMap] = useState<Record<string, Record<string, number>>>({});
+	const [statusConcMap] = useState<Record<string, Record<string, number>>>({});
+	const [reasonsMap] = useState<Record<string, Record<string, number>>>({});
 	const [statusSapList, setStatusSapList] = useState<string[]>([]);
 	const [tiposList, setTiposList] = useState<string[]>([]);
 	const [mesesList, setMesesList] = useState<string[]>([]);
@@ -278,11 +277,59 @@ export default function CarteiraObras() {
 		return Number.isNaN(n) ? 0 : n
 	}
 	const normalize = (s?: string) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
+
+	// Normalizador para registros vindos do backend (chaves como nos cabeçalhos da planilha)
+	const normalizeBackendRows = (rows: unknown[]): MatrizItem[] => {
+		const out: MatrizItem[] = []
+		for (const r of rows as Array<Record<string, unknown>> || []) {
+			const getS = (k: string, alt: string[] = []) => {
+				const all = [k, ...alt]
+				for (const key of all) {
+					if (Object.prototype.hasOwnProperty.call(r, key)) {
+						const v = (r as Record<string, unknown>)[key]
+						if (v != null && String(v).trim() !== '') return String(v).trim()
+					}
+				}
+				return ''
+			}
+			const getN = (k: string, alt: string[] = []) => {
+				const s = getS(k, alt)
+				if (!s) return 0
+				const cleaned = s.replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')
+				const n = Number(parseFloat(cleaned))
+				return Number.isNaN(n) ? 0 : n
+			}
+
+			out.push({
+				pep: getS('PEP', ['Pep','pep']),
+				prazo: getS('Data limite', ['DATA LIMITE','Prazo','PRAZO','prazo']),
+				dataConclusao: getS('data prog/conc', ['Data prog/conc','DATA PROG/CONC','Data Conclusão','DATA CONCLUSÃO','dataConclusao','data']),
+				municipio: getS('Municipio', ['Município','MUNICIPIO','municipio']),
+				statusSap: getS('STATUS SAP', ['Status SAP','statusSap','status']),
+				valor: getN('R$', ['Valor (R$)','Valor','valor','RS','rs']),
+				seccional: getS('SECCIONAL', ['Seccional','seccional','Seccao','seccao']),
+				tipo: getS('TIPO', ['Tipo','tipo']),
+				statusFim: getS('STATUS FIM', ['Status Fim','Status fim','statusFim']),
+				statusAgrupado: getS('STATUS AGRUPADO', ['Status Agrupado','Status agrupado','statusAgrupado'])
+			})
+		}
+		return out
+	}
 	const groupByStatusFim = React.useCallback((rows: Array<Record<string, unknown> | MatrizItem>, agrupado: string) => {
+		const norm = (s: string) => normalize(s)
+		const stemMatch = (a: string, b: string) => {
+			// igual, singular/plural equivalentes, ou mesma raiz ('concluid', 'parad', 'andamento')
+			if (a === b) return true
+			if (a.endsWith('s') && a.slice(0, -1) === b) return true
+			if (b.endsWith('s') && b.slice(0, -1) === a) return true
+			const stems = ['concluid', 'parad', 'andamento']
+			return stems.some(st => a.includes(st) && b.includes(st))
+		}
+		const target = norm(agrupado)
 		const map = new Map<string, { value: number; pepSet: Set<string> }>()
 		for (const r of rows) {
-			const statusAgr = normalize(getFieldString(r, 'statusAgrupado'))
-			if (statusAgr !== normalize(agrupado)) continue
+			const statusAgr = norm(getFieldString(r, 'statusAgrupado'))
+			if (!stemMatch(statusAgr, target)) continue
 			const key = getFieldString(r, 'statusFim') || '—'
 			const pep = getFieldString(r, 'pep') || `pep-${Math.random().toString(36).slice(2,8)}`
 			const cur = map.get(key) || { value: 0, pepSet: new Set<string>() }
@@ -630,127 +677,43 @@ export default function CarteiraObras() {
 		setRegions(regionList);
 	}, [rawRows]);
 
-	// Carregar listas dos filtros (Status SAP, Tipo, Mês)
+	// Carregar listas dos filtros (Status SAP, Tipo, Mês) a partir dos dados carregados
 	useEffect(() => {
-	// antigo controle de cancelamento removido (fonte: planilha agora em client-side)
-			// antes: carregamento via backend. Agora os dados de filtros virão da planilha.
-		}, []);
+		const status = new Set<string>()
+		const tipos = new Set<string>()
+		const meses = new Set<string>()
+		for (const r of rawRows) {
+			const s = String(r.statusSap || '').trim(); if (s) status.add(s)
+			const t = String(r.tipo || '').trim(); if (t) tipos.add(t)
+			const v = String(r.dataConclusao || r.prazo || '')
+			const mo = v.match(/\/(\d{1,2})\/(\d{4})$/)
+			if (mo) meses.add(String(mo[1]))
+		}
+		setStatusSapList(Array.from(status))
+		setTiposList(Array.from(tipos))
+		setMesesList(Array.from(meses))
+	}, [rawRows])
 
-	// Carga da matriz com filtros (exceto região/comparativo, que são aplicados apenas no cliente)
+
+
+
+	// Carregar dados da aba CarteiraObras via backend (mesmo padrão da página Programacao)
 	useEffect(() => {
-	// antigo controle de cancelamento removido (fonte: planilha agora em client-side)
-	const fmt = (d?: Date) => d ? `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` : undefined;
-		const params: Record<string, string> = {};
-		// NÃO enviar seccional aqui: manter todas as regiões para o gráfico comparativo
-		const di = fmt(selectedStartDate);
-		const df = fmt(selectedEndDate);
-		// Enviar data_inicio e/ou data_fim individualmente para suportar filtro "apenas início" ou "apenas fim"
-		if (di) params.data_inicio = di;
-		if (df) params.data_fim = df;
-		if (selectedStatusSap) params.status_sap = selectedStatusSap;
-		if (selectedTipo) params.tipo = selectedTipo;
-		if (selectedMes) params.mes = selectedMes;
-		// Filtros interativos dos gráficos
-		if (activeFilters.statusENER) params.status_ener = activeFilters.statusENER;
-		if (activeFilters.statusCONC) params.status_conc = activeFilters.statusCONC;
-		if (activeFilters.reasons) params.status_servico = activeFilters.reasons;
-			// antes: carregamento via backend com params. Agora a matriz virá da planilha (cliente aplica filtros)
-		}, [selectedStartDate, selectedEndDate, selectedStatusSap, selectedTipo, selectedMes, activeFilters.statusENER, activeFilters.statusCONC, activeFilters.reasons]);
-
-	// Fallback: buscar mapas agregados do backend quando necessário (produção antiga)
-	useEffect(() => {
-	// antigo controle de cancelamento removido (fonte: planilha agora em client-side)
-	const fmt = (d?: Date) => d ? `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` : undefined;
-		const params: Record<string, string> = {};
-		if (selectedRegion !== 'all') params.seccional = selectedRegion;
-		const di = fmt(selectedStartDate);
-		const df = fmt(selectedEndDate);
-		// Enviar data_inicio e/ou data_fim individualmente para suportar filtro "apenas início" ou "apenas fim"
-		if (di) params.data_inicio = di;
-		if (df) params.data_fim = df;
-		if (selectedStatusSap) params.status_sap = selectedStatusSap;
-		if (selectedTipo) params.tipo = selectedTipo;
-		if (selectedMes) params.mes = selectedMes;
-			// antes: buscava mapas agregados no backend. Agora usaremos os mapas gerados pelo hook da planilha.
-		}, [selectedRegion, selectedStartDate, selectedEndDate, selectedStatusSap, selectedTipo, selectedMes]);
-
-		// --- Integração com Google Sheets: fonte de dados 'CarteiraObras' ---
-		const SHEET_ID = '1wj3AZ5__Ak8THPHu-Lr1iGU-7l9fX8sf6MVY-kBMFhI'
-		const {
-			seccionais: sheetSeccionais,
-			statusSapList: sheetStatusSapList,
-			tiposList: sheetTiposList,
-			mesesList: sheetMesesList,
-			graficoEner,
-			graficoConc,
-			graficoServico,
-			graficoSeccionalRS,
-			matriz: sheetMatriz,
-			loadError: sheetLoadError,
-		} = useGoogleSheetCarteira(SHEET_ID, 'CarteiraObras')
-
-		// sincroniza dados da planilha com os estados locais usados pelo restante do componente
-		useEffect(() => {
-			if (Array.isArray(sheetMatriz) && sheetMatriz.length) {
-				setRawRows(sheetMatriz as MatrizItem[])
-				try { showToast(`Carteira de Obras Carregado: ${sheetMatriz.length} linhas`); } catch (e) { console.debug('toast:', e) }
-			}
-			// se houver erro de carga, informar usuário com toast e manter a tela indicando problema
-			if (sheetLoadError) {
-				if (sheetLoadError === 'invalid_response') {
-					try { showToast('Erro ao carregar planilha: verifique se a aba "CarteiraObras" existe e se a planilha está pública'); } catch (e) { console.debug(e) }
-				} else if (sheetLoadError === 'network_error') {
-					try { showToast('Erro de rede ao acessar a planilha. Verifique conectividade e permissões'); } catch (e) { console.debug(e) }
-				} else {
-					try { showToast('Erro ao carregar a planilha'); } catch (e) { console.debug(e) }
-				}
-			}
-
-			// Se houve erro ao carregar direto da planilha, tentar rota backend específica 'carteira-obras' antes do fallback genérico
-				if (sheetLoadError) {
-					// tentar ambos endpoints backend em paralelo e pegar o primeiro com dados
-					let cancelled = false
-					Promise.allSettled([
-						getCarteiraObras(),
-						getMatrizDados(),
-					])
-						.then((results) => {
-							if (cancelled) return
-							for (const r of results) {
-								if (r.status === 'fulfilled') {
-									const val = (r as PromiseFulfilledResult<unknown>).value
-									let data: unknown[] = []
-									if (val && typeof val === 'object') {
-										const vObj = val as { data?: unknown }
-										if (Array.isArray(vObj.data)) data = vObj.data as unknown[]
-										else if (Array.isArray((val as unknown))) data = val as unknown[]
-									} else if (Array.isArray(val)) {
-										data = val as unknown[]
-									}
-									if (Array.isArray(data) && data.length) {
-										setRawRows(data as MatrizItem[])
-										try { showToast(`Carteira de Obras (backend) Carregado: ${data.length} linhas`); } catch (e) { console.debug(e) }
-										return
-									}
-								}
-							}
-							// se nenhum retornou dados
-							try { showToast('Erro ao carregar dados do backend como fallback'); } catch (e) { console.debug(e) }
-						})
-						.catch((err) => {
-							console.error('Erro ao tentar fallbacks backend', err)
-							try { showToast('Erro ao carregar dados do backend como fallback'); } catch (e) { console.debug(e) }
-						})
-					return () => { cancelled = true }
-				}
-			setStatusEnerMap(graficoEner || {})
-			setStatusConcMap(graficoConc || {})
-			setReasonsMap(graficoServico || {})
-			if (Array.isArray(sheetSeccionais) && sheetSeccionais.length) setRegions(sheetSeccionais)
-			if (Array.isArray(sheetStatusSapList) && sheetStatusSapList.length) setStatusSapList(sheetStatusSapList)
-			if (Array.isArray(sheetTiposList) && sheetTiposList.length) setTiposList(sheetTiposList)
-			if (Array.isArray(sheetMesesList) && sheetMesesList.length) setMesesList(sheetMesesList)
-		}, [sheetMatriz, sheetSeccionais, sheetStatusSapList, sheetTiposList, sheetMesesList, graficoEner, graficoConc, graficoServico, graficoSeccionalRS, sheetLoadError]);
+		let cancelled = false
+		getCarteiraObras()
+			.then((res) => {
+				if (cancelled) return
+				const data = (res && (res as { data?: unknown[] }).data) || []
+				const mapped = normalizeBackendRows(Array.isArray(data) ? data : [])
+				setRawRows(mapped as MatrizItem[])
+				try { showToast(`Carteira de Obras (backend) Carregado: ${mapped.length} linhas`) } catch (e) { console.debug(e) }
+			})
+			.catch((err) => {
+				console.error('Erro ao carregar CarteiraObras via backend', err)
+				try { showToast('Erro ao carregar Carteira de Obras via backend') } catch (e) { console.debug(e) }
+			})
+		return () => { cancelled = true }
+	}, [])
 
 	// Copiar imagem
 	const copyChartImage = async (chartRef: React.RefObject<HTMLDivElement | null>, chartName: string) => {
@@ -780,30 +743,6 @@ export default function CarteiraObras() {
 			console.error('Erro ao capturar gráfico:', error);
 			showToast(`Erro ao copiar imagem do gráfico ${chartName}`);
 		}
-
-		// fallback: se a leitura direta da planilha falhar ou não retornar linhas,
-		// tentar buscar do backend (mesmo endpoint usado por PrazosSAP)
-		if ((!Array.isArray(sheetMatriz) || !sheetMatriz.length) && !sheetLoadError) {
-			// nada carregado da planilha, mas sem erro explícito; não forçar fallback
-			return
-		}
-		if ((sheetLoadError || (Array.isArray(sheetMatriz) && sheetMatriz.length === 0))) {
-			let cancelled = false
-			getMatrizDados()
-				.then((res) => {
-					if (cancelled) return
-					const data = (res && (res as { data?: MatrizItem[] }).data) || []
-					if (Array.isArray(data) && data.length) {
-						setRawRows(data as MatrizItem[])
-						try { showToast(`Carteira de Obras (backend) Carregado: ${data.length} linhas`); } catch (e) { console.debug(e) }
-					}
-				})
-				.catch((err) => {
-					console.error('Fallback backend getMatrizDados failed', err)
-					try { showToast('Erro ao carregar dados do backend como fallback'); } catch (e) { console.debug(e) }
-				})
-			return () => { cancelled = true }
-		}
 	};
 
 	// Exportar Excel
@@ -830,14 +769,6 @@ export default function CarteiraObras() {
 
 	return (
 		<div className="relative z-10 min-h-screen bg-transparent lovable">
-			{sheetLoadError && (
-				<div className="fixed top-16 left-1/2 -translate-x-1/2 z-60 w-[95%] max-w-[1200px]">
-					<div className="p-3 text-sm font-semibold text-white bg-red-600 rounded-md shadow-md">{
-						sheetLoadError === 'invalid_response' ? 'Erro ao carregar planilha: verifique se a aba "CarteiraObras" existe e se a planilha está pública' :
-						sheetLoadError === 'network_error' ? 'Erro de rede ao acessar a planilha. Verifique conectividade e permissões' : 'Erro ao carregar a planilha'
-					}</div>
-				</div>
-			)}
 			{/* Fundo animado em toda a página (fixo atrás do conteúdo) - sem badge nesta página */}
 			<FundoAnimado showBadge={false} />
 			<header className="fixed top-0 left-0 right-0 z-50 border-b border-green-500 shadow-md bg-gradient-to-r from-green-600 via-green-600/90 to-green-700">

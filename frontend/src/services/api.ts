@@ -13,6 +13,9 @@ export interface MatrixRowApi {
   valor: string | number
   seccional: string
   tipo: string
+  municipio?: string
+  statusFim?: string
+  statusAgrupado?: string
   // Campos opcionais suportados por páginas que usam produção antiga
   statusEner?: string
   statusConc?: string
