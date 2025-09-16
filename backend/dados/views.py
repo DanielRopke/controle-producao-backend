@@ -1090,17 +1090,17 @@ def meses_conclusao(request):
         return Response({'error': str(e)}, status=500)
 
 
-    @api_view(['GET'])
-    @permission_classes([DEFAULT_GET_PERMISSION])
-    def carteira_obras(request):
-        """
-        Endpoint que retorna os dados da aba 'CarteiraObras'.
-        Usa cache interno e as credenciais presentes no repositório/variáveis de ambiente.
-        """
-        try:
-            data = get_sheet_maybe_cached('CarteiraObras', request)
-            return Response(data)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return Response({'error': str(e)}, status=500)
+@api_view(['GET'])
+@permission_classes([DEFAULT_GET_PERMISSION])
+def carteira_obras(request):
+    """
+    Endpoint que retorna os dados da aba 'CarteiraObras'.
+    Usa cache interno e as credenciais presentes no repositório/variáveis de ambiente.
+    """
+    try:
+        data = get_sheet_maybe_cached('CarteiraObras', request)
+        return Response(data)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
