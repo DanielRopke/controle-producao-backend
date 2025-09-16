@@ -59,6 +59,7 @@ export default function CarteiraObras() {
 	const [contextOpen, setContextOpen] = useState(false);
 	const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
 	const [contextItems, setContextItems] = useState<{ id: string; label: string; onClick: () => void }[]>([]);
+	const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
 	// garante que os estados do menu de contexto sejam lidos pelo TS (evita TS6133)
 	useEffect(() => {
@@ -88,19 +89,26 @@ export default function CarteiraObras() {
 		};
 	}, []);
 
+	// (runtimeError overlay rendered inline later)
+
 	// Global error handlers to surface runtime exceptions as toasts (ajuda debug em produção)
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const onError = (ev: ErrorEvent) => {
 			try {
+				const msg = String(ev.message || ev.error || 'Erro desconhecido')
 				console.error('Global error captured in CarteiraObras', ev.error || ev.message, ev);
-				showToast(`Erro na página Carteira de Obras: ${String(ev.message || ev.error || 'ver console')}`);
+				setRuntimeError(msg)
+				showToast(`Erro na página Carteira de Obras: ${msg}`);
 			} catch (e) { console.debug('failed to report global error', e) }
 		};
 		const onRejection = (ev: PromiseRejectionEvent) => {
 			try {
+				const reason = ev.reason
+				const msg = reason && reason.message ? String(reason.message) : String(reason || 'Rejeição não tratada')
 				console.error('Unhandled rejection in CarteiraObras', ev.reason);
-				showToast(`Erro não tratado: ${String(ev.reason?.message || ev.reason || 'ver console')}`);
+				setRuntimeError(msg)
+				showToast(`Erro não tratado: ${msg}`);
 			} catch (e) { console.debug('failed to report rejection', e) }
 		};
 		window.addEventListener('error', onError as EventListener);
@@ -110,6 +118,7 @@ export default function CarteiraObras() {
 			window.removeEventListener('unhandledrejection', onRejection as EventListener);
 		};
 	}, []);
+
 
 	// Estados para filtros interativos
 	const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
@@ -653,23 +662,23 @@ export default function CarteiraObras() {
 		try {
 			const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true, allowTaint: true });
 			canvas.toBlob((blob) => {
-				if (blob) {
-							try {
-								if (typeof (window as any).ClipboardItem !== 'function') {
-									showToast('API ClipboardImage não suportada neste navegador');
-									return;
-								}
-								const item = new (window as any).ClipboardItem({ 'image/png': blob });
-								navigator.clipboard.write([item]).then(() => {
-									showToast(`Imagem do gráfico ${chartName} copiada!`);
-								}).catch(() => {
-									showToast(`Erro ao copiar imagem do gráfico ${chartName}`);
-								});
-							} catch (e) {
-								console.error('Erro ao tentar copiar imagem para clipboard', e)
-								showToast(`Erro ao copiar imagem do gráfico ${chartName}`);
-							}
-				}
+					if (blob) {
+						try {
+							// Fallback seguro: gerar URL e forçar download da imagem
+							const url = URL.createObjectURL(blob)
+							const a = document.createElement('a')
+							a.href = url
+							a.download = `grafico-${String(chartName).replace(/\s+/g, '_')}.png`
+							document.body.appendChild(a)
+							a.click()
+							a.remove()
+							URL.revokeObjectURL(url)
+							showToast(`Imagem do gráfico ${chartName} baixada (fallback)`)
+						} catch (e) {
+							console.error('Erro ao tentar salvar imagem', e)
+							showToast(`Erro ao copiar imagem do gráfico ${chartName}`)
+						}
+					}
 			});
 		} catch (error) {
 			console.error('Erro ao capturar gráfico:', error);
@@ -1335,6 +1344,18 @@ export default function CarteiraObras() {
 			items={contextItems}
 			onClose={() => setContextOpen(false)}
 		/>
+		{/* Runtime error overlay */}
+		{runtimeError ? (
+			<div className="fixed inset-0 z-80 flex items-center justify-center bg-black/60 p-4">
+				<div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-6">
+					<h2 className="text-lg font-semibold mb-2">Erro na página Carteira de Obras</h2>
+					<p className="text-sm text-gray-700 mb-4">{runtimeError}</p>
+					<div className="text-right">
+						<button className="px-4 py-2 bg-green-600 text-white rounded" onClick={() => setRuntimeError(null)}>Fechar</button>
+					</div>
+				</div>
+			</div>
+		) : null}
 		</div>
 	);
 }
