@@ -42,7 +42,7 @@ type BarLabelProps = {
 type ChartTickProps = { x?: number; y?: number; payload?: { value?: string } };
 // (intencionalmente removido tipo BarDatumLike não utilizado)
 
-export default function PrazosSAP() {
+export default function CarteiraObras() {
 	const navigate = useNavigate();
 	const [selectedRegion, setSelectedRegion] = useState<string>('all');
 	const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -81,7 +81,7 @@ export default function PrazosSAP() {
 	// Título da janela quando nesta página
 	useEffect(() => {
 		const prevTitle = document.title;
-		document.title = 'Prazos SAP';
+		document.title = 'Carteira de Obras';
 		return () => {
 			document.title = prevTitle;
 		};
@@ -391,11 +391,12 @@ export default function PrazosSAP() {
 		const n = Number(parseFloat(s))
 		return Number.isNaN(n) ? 0 : n
 	}
+	const normalize = (s?: string) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
 	const groupByStatusFim = React.useCallback((rows: Array<Record<string, unknown> | MatrizItem>, agrupado: string) => {
 		const map = new Map<string, { value: number; pepSet: Set<string> }>()
 		for (const r of rows) {
-			const statusAgr = getFieldString(r, 'statusAgrupado')
-			if (statusAgr !== agrupado) continue
+			const statusAgr = normalize(getFieldString(r, 'statusAgrupado'))
+			if (statusAgr !== normalize(agrupado)) continue
 			const key = getFieldString(r, 'statusFim') || '—'
 			const pep = getFieldString(r, 'pep') || `pep-${Math.random().toString(36).slice(2,8)}`
 			const cur = map.get(key) || { value: 0, pepSet: new Set<string>() }
@@ -632,7 +633,7 @@ export default function PrazosSAP() {
 					{/* Título centralizado */}
 					<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
 						<h1 className="font-inter text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-wide leading-none text-white drop-shadow-[0_3px_6px_rgba(0,0,0,0.35)]">
-							Prazos SAP
+							Carteira de Obras
 						</h1>
 					</div>
 					<div className="flex items-center gap-3 lg:gap-6">
@@ -1067,7 +1068,7 @@ export default function PrazosSAP() {
 
 					<Card className="shadow-card hover:shadow-card-hover bg-white border-gray-200 transform transition-all duration-300 hover:scale-[1.01]">
 						<CardHeader className="flex flex-row items-center justify-between bg-white border-b border-gray-300 rounded-t-xl">
-							<CardTitle className="text-lg font-semibold text-secondary-foreground">Matriz de Prazos SAP</CardTitle>
+							<CardTitle className="text-lg font-semibold text-secondary-foreground">Matriz da Carteira de Obras</CardTitle>
 							<Button
 								size="sm"
 								onClick={handleExportExcel}

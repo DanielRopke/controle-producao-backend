@@ -16,6 +16,7 @@ export interface MatrizRow {
   pep?: string
   prazo?: string
   dataConclusao?: string
+  municipio?: string
   statusSap?: string
   valor?: number
   seccional?: string
@@ -108,6 +109,7 @@ export default function useGoogleSheetCarteira(sheetId: string, sheetName = 'Car
           pep: String(r.PEP || r.pep || r.PEP_ || r['Pep'] || r.pep || '') || undefined,
           prazo: String(r.Prazo || r.prazo || r.PRAZO || '') || undefined,
           dataConclusao: String(r['Data Conclusão'] || r.dataConclusao || r.data || '') || undefined,
+          municipio: String(r.Municipio || r.municipio || r['MUNICIPIO'] || r['Município'] || '') || undefined,
           statusSap: String(r['Status SAP'] || r.statusSap || r.status || '') || undefined,
           statusFim: String(r['STATUS FIM'] || r['Status Fim'] || r.statusFim || r['Status FIM'] || r['Status fim'] || '') || undefined,
           statusAgrupado: String(r['STATUS AGRUPADO'] || r['Status Agrupado'] || r.statusAgrupado || r['Status agrupado'] || '') || undefined,
