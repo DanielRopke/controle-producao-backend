@@ -584,6 +584,37 @@ export default function CarteiraObras() {
 					try { showToast('Erro ao carregar a planilha'); } catch (e) { console.debug(e) }
 				}
 			}
+
+			// Se houve erro ao carregar direto da planilha, tentar rota backend específica 'carteira-obras' antes do fallback genérico
+			if (sheetLoadError) {
+				let cancelled = false
+				getCarteiraObras()
+					.then((res) => {
+						if (cancelled) return
+						const data = (res && (res as { data?: MatrizItem[] }).data) || []
+						if (Array.isArray(data) && data.length) {
+							setRawRows(data as MatrizItem[])
+							try { showToast(`Carteira de Obras (backend) Carregado: ${data.length} linhas`); } catch (e) { console.debug(e) }
+						}
+					})
+					.catch((err) => {
+						console.error('Fallback backend carteira-obras failed', err)
+						// se falhou, tentar /matriz-dados/ como antes
+						getMatrizDados()
+							.then((res2) => {
+								const d2 = (res2 && (res2 as { data?: MatrizItem[] }).data) || []
+								if (Array.isArray(d2) && d2.length) {
+									setRawRows(d2 as MatrizItem[])
+									try { showToast(`Carteira de Obras (backend matriz-dados) Carregado: ${d2.length} linhas`); } catch (e) { console.debug(e) }
+								}
+							})
+							.catch((err2) => {
+								console.error('Fallback matriz-dados failed', err2)
+								try { showToast('Erro ao carregar dados do backend como fallback'); } catch (e) { console.debug(e) }
+							})
+					})
+				return () => { cancelled = true }
+			}
 			setStatusEnerMap(graficoEner || {})
 			setStatusConcMap(graficoConc || {})
 			setReasonsMap(graficoServico || {})

@@ -125,6 +125,7 @@ export const api = {
   getGraficoServico: (filters?: BaseFilters) => get<Record<string, Record<string, number>>>('/status-servico-contagem/', filters ? buildParams(filters) : undefined),
   getGraficoSeccionalRS: (filters?: BaseFilters) => get<Record<string, { valor: number; pep_count: number }>>('/seccional-rs-pep/', filters ? buildParams(filters) : undefined),
   getMatrizDados: (filters?: BaseFilters) => get<MatrixRowApi[]>('/matriz-dados/', filters ? buildParams(filters) : undefined),
+  getCarteiraObras: (filters?: BaseFilters) => get<MatrixRowApi[]>('/carteira-obras/', filters ? buildParams(filters) : undefined),
   // Auth
   register: async (payload: RegisterPayload) => {
     const res = await axios.post(`${API_BASE}/auth/register`, payload)
@@ -260,6 +261,10 @@ export function getTiposUnicos() {
 
 export function getMesesConclusao() {
   return axios.get(`${API_BASE}/meses-conclusao/`)
+}
+
+export function getCarteiraObras(params: Record<string, string> = {}) {
+  return axios.get(`${API_BASE}/carteira-obras/`, { params })
 }
 
 // ================== Auth ==================
