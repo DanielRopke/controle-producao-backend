@@ -296,16 +296,16 @@ export default function Cadastro() {
                 const v = e.currentTarget.value.trim().toLowerCase()
                 if (!v) return
                 try {
-                  const resp = await (api as any).checkEmail(v)
+                  const resp = await api.checkEmail(v)
                   if (resp && resp.exists === false) {
                     // se o backend diz que o e-mail nao existe, limpar chave localStorage
                     const key = `register_firstSentAt:${v}`
-                    try { localStorage.removeItem(key) } catch(e){ }
+                    try { localStorage.removeItem(key) } catch { /* ignore storage errors */ }
                     // atualizar estado local para refletir limpeza
                     setFirstSentAt(null)
                     setRemainingSeconds(0)
                   }
-                } catch (err) {
+                } catch {
                   // falha silenciosa: não bloquear o fluxo por erro de rede
                 }
               }}
