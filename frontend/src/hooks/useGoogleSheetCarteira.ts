@@ -56,6 +56,7 @@ export default function useGoogleSheetCarteira(sheetId: string, sheetName = 'Car
   const [graficoServico, setGraficoServico] = useState<Record<string, Record<string, number>>>({})
   const [graficoSeccionalRS, setGraficoSeccionalRS] = useState<Record<string, { valor: number; pep_count: number }>>({})
   const [matriz, setMatriz] = useState<MatrizRow[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!sheetId) return
@@ -91,6 +92,8 @@ export default function useGoogleSheetCarteira(sheetId: string, sheetName = 'Car
           parsed = null
         }
         if (!parsed || !parsed.table) {
+          // sinaliza que não recebeu dados válidos da URL (p.ex. redirect para login ou permissões)
+          setLoadError('invalid_response')
           return
         }
         const cols: string[] = (parsed.table.cols || []).map((c) => String((c.label || c.id || '')).trim())
@@ -152,8 +155,12 @@ export default function useGoogleSheetCarteira(sheetId: string, sheetName = 'Car
         for (const [k, v] of seccMap.entries()) seccObj[k] = { valor: Math.round(v.valor || 0), pep_count: v.pepSet.size }
         setGraficoSeccionalRS(seccObj)
       })
-      .catch(() => {
-        // ignore, keep defaults
+      .catch((err) => {
+        // register load error for the caller to show a helpful message
+        try {
+          console.error('useGoogleSheetCarteira fetch error', err)
+        } catch (e) { console.debug('error logging failed', e) }
+        setLoadError('network_error')
       })
     return () => {
       cancelled = true
@@ -170,5 +177,6 @@ export default function useGoogleSheetCarteira(sheetId: string, sheetName = 'Car
     graficoServico,
     graficoSeccionalRS,
     matriz,
+    loadError,
   }
 }

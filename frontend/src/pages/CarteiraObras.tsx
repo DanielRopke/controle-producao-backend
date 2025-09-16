@@ -15,6 +15,7 @@ import { PEPSearch } from '../components/PEPSearch';
 import { cn } from "../lib/utils";
 import useGoogleSheetCarteira from '../hooks/useGoogleSheetCarteira';
 import type { MatrizItem } from '../services/api';
+import { getMatrizDados } from '../services/api';
 import { showToast } from '../components/toast';
 import LogoSetup from '../assets/LogoSetup1.png';
 import { FundoAnimado } from '../components/FundoAnimado';
@@ -564,6 +565,7 @@ export default function CarteiraObras() {
 			graficoServico,
 			graficoSeccionalRS,
 			matriz: sheetMatriz,
+			loadError: sheetLoadError,
 		} = useGoogleSheetCarteira(SHEET_ID, 'CarteiraObras')
 
 		// sincroniza dados da planilha com os estados locais usados pelo restante do componente
@@ -572,6 +574,16 @@ export default function CarteiraObras() {
 				setRawRows(sheetMatriz as MatrizItem[])
 				try { showToast(`Carteira de Obras Carregado: ${sheetMatriz.length} linhas`); } catch (e) { console.debug('toast:', e) }
 			}
+			// se houver erro de carga, informar usuário com toast e manter a tela indicando problema
+			if (sheetLoadError) {
+				if (sheetLoadError === 'invalid_response') {
+					try { showToast('Erro ao carregar planilha: verifique se a aba "CarteiraObras" existe e se a planilha está pública'); } catch (e) { console.debug(e) }
+				} else if (sheetLoadError === 'network_error') {
+					try { showToast('Erro de rede ao acessar a planilha. Verifique conectividade e permissões'); } catch (e) { console.debug(e) }
+				} else {
+					try { showToast('Erro ao carregar a planilha'); } catch (e) { console.debug(e) }
+				}
+			}
 			setStatusEnerMap(graficoEner || {})
 			setStatusConcMap(graficoConc || {})
 			setReasonsMap(graficoServico || {})
@@ -579,7 +591,7 @@ export default function CarteiraObras() {
 			if (Array.isArray(sheetStatusSapList) && sheetStatusSapList.length) setStatusSapList(sheetStatusSapList)
 			if (Array.isArray(sheetTiposList) && sheetTiposList.length) setTiposList(sheetTiposList)
 			if (Array.isArray(sheetMesesList) && sheetMesesList.length) setMesesList(sheetMesesList)
-		}, [sheetMatriz, sheetSeccionais, sheetStatusSapList, sheetTiposList, sheetMesesList, graficoEner, graficoConc, graficoServico, graficoSeccionalRS]);
+		}, [sheetMatriz, sheetSeccionais, sheetStatusSapList, sheetTiposList, sheetMesesList, graficoEner, graficoConc, graficoServico, graficoSeccionalRS, sheetLoadError]);
 
 	// Copiar imagem
 	const copyChartImage = async (chartRef: React.RefObject<HTMLDivElement | null>, chartName: string) => {
@@ -599,6 +611,30 @@ export default function CarteiraObras() {
 		} catch (error) {
 			console.error('Erro ao capturar gráfico:', error);
 			showToast(`Erro ao copiar imagem do gráfico ${chartName}`);
+		}
+
+		// fallback: se a leitura direta da planilha falhar ou não retornar linhas,
+		// tentar buscar do backend (mesmo endpoint usado por PrazosSAP)
+		if ((!Array.isArray(sheetMatriz) || !sheetMatriz.length) && !sheetLoadError) {
+			// nada carregado da planilha, mas sem erro explícito; não forçar fallback
+			return
+		}
+		if ((sheetLoadError || (Array.isArray(sheetMatriz) && sheetMatriz.length === 0))) {
+			let cancelled = false
+			getMatrizDados()
+				.then((res) => {
+					if (cancelled) return
+					const data = (res && (res as { data?: MatrizItem[] }).data) || []
+					if (Array.isArray(data) && data.length) {
+						setRawRows(data as MatrizItem[])
+						try { showToast(`Carteira de Obras (backend) Carregado: ${data.length} linhas`); } catch (e) { console.debug(e) }
+					}
+				})
+				.catch((err) => {
+					console.error('Fallback backend getMatrizDados failed', err)
+					try { showToast('Erro ao carregar dados do backend como fallback'); } catch (e) { console.debug(e) }
+				})
+			return () => { cancelled = true }
 		}
 	};
 
@@ -626,6 +662,14 @@ export default function CarteiraObras() {
 
 	return (
 		<div className="relative z-10 min-h-screen bg-transparent lovable">
+			{sheetLoadError && (
+				<div className="fixed top-16 left-1/2 -translate-x-1/2 z-60 w-[95%] max-w-[1200px]">
+					<div className="p-3 text-sm font-semibold text-white bg-red-600 rounded-md shadow-md">{
+						sheetLoadError === 'invalid_response' ? 'Erro ao carregar planilha: verifique se a aba "CarteiraObras" existe e se a planilha está pública' :
+						sheetLoadError === 'network_error' ? 'Erro de rede ao acessar a planilha. Verifique conectividade e permissões' : 'Erro ao carregar a planilha'
+					}</div>
+				</div>
+			)}
 			{/* Fundo animado em toda a página (fixo atrás do conteúdo) - sem badge nesta página */}
 			<FundoAnimado showBadge={false} />
 			<header className="fixed top-0 left-0 right-0 z-50 border-b border-green-500 shadow-md bg-gradient-to-r from-green-600 via-green-600/90 to-green-700">

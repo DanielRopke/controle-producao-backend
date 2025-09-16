@@ -1,6 +1,6 @@
 
 import React from 'react';
-// @ts-ignore
+// html2canvas has no types in this project; import anyway and handle at runtime
 import html2canvas from 'html2canvas';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -77,7 +77,6 @@ export function GraficoBarras({ titulo, dados, cor = "#4ade80" }: Props) {
           <foreignObject x={0} y={0} width="100%" height="100%">
             <div style={{width: '100%', height: '100%', background: 'rgba(255,255,255,0.9)', borderRadius: 20, backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(16px)'}} />
           </foreignObject>
-            <div style={{width: '100%', height: '100%', background: 'rgba(255,255,255,0.9)', borderRadius: 20, backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(16px)'}} />
           <YAxis hide />
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="status" tick={{ fill: '#4a4a4a' }} interval={0} />

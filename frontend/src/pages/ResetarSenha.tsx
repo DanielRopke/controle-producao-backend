@@ -48,8 +48,26 @@ export default function ResetarSenha() {
       const res = await api.requestPasswordResetConfirm(uid, token, password)
       toast.success(res?.message || 'Senha alterada com sucesso')
       setTimeout(() => navigate('/login'), 900)
-    } catch (err:any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.password || String(err)
+    } catch (err: unknown) {
+      // Extrai mensagem segura de erro sem usar 'any'
+      let msg = 'Falha ao alterar senha'
+      try {
+        if (typeof err === 'string') {
+          msg = err
+        } else if (err && typeof err === 'object') {
+          const e = err as Record<string, unknown>
+          const resp = e['response'] as Record<string, unknown> | undefined
+          const data = resp?.['data'] as Record<string, unknown> | undefined
+          const candidate = data?.['error'] ?? data?.['password']
+          if (typeof candidate === 'string') msg = candidate
+          else msg = String(err)
+        } else {
+          msg = String(err)
+        }
+      } catch (e) {
+        // ignore extraction errors and fall back to default msg
+        void e
+      }
       toast.error(msg || 'Falha ao alterar senha')
     } finally { setLoading(false) }
   }

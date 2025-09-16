@@ -59,12 +59,14 @@ export default function PrazosSAP() {
   // Função para clique nas colunas dos gráficos
   function handleChartClick(
     chartType: 'statusENER'|'statusCONC'|'comparison'|'reasons',
-    dataPoint: { payload?: unknown; [k: string]: any }
+    dataPoint: { payload?: Record<string, unknown>; [k: string]: unknown }
   ) {
-    const payload = dataPoint && (dataPoint.payload || dataPoint) as any;
+    const payload = dataPoint
+      ? (('payload' in dataPoint && dataPoint.payload) ? (dataPoint.payload as Record<string, unknown>) : (dataPoint as Record<string, unknown>))
+      : {};
     const value = chartType === 'comparison'
-      ? payload?.seccional
-      : (payload?.status ?? payload?.name);
+      ? String(payload['seccional'] ?? '')
+      : String(payload['status'] ?? payload['name'] ?? '');
     if (!value) return;
     setActiveFilters(prev => ({
       ...prev,
