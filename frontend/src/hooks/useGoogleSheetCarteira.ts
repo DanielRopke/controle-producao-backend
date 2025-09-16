@@ -88,11 +88,14 @@ export default function useGoogleSheetCarteira(sheetId: string, sheetName = 'Car
         let parsed: Parsed | null = null
         try {
           parsed = JSON.parse(jsonStr) as Parsed
-        } catch {
+        } catch (e: unknown) {
+          const snippet = typeof jsonStr === 'string' ? jsonStr.slice(0, 800) : String(jsonStr)
+          try { console.error('useGoogleSheetCarteira JSON.parse failed', { err: e, snippet }) } catch (ee) { console.debug('failed to log parse error', ee) }
           parsed = null
         }
         if (!parsed || !parsed.table) {
           // sinaliza que não recebeu dados válidos da URL (p.ex. redirect para login ou permissões)
+          try { console.warn('useGoogleSheetCarteira invalid parsed table', { status: res.status, bodyPrefix: String(String(res.data || '').slice(0, 800)) }) } catch (e) { console.debug('warn failed', e) }
           setLoadError('invalid_response')
           return
         }
@@ -155,7 +158,7 @@ export default function useGoogleSheetCarteira(sheetId: string, sheetName = 'Car
         for (const [k, v] of seccMap.entries()) seccObj[k] = { valor: Math.round(v.valor || 0), pep_count: v.pepSet.size }
         setGraficoSeccionalRS(seccObj)
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         // register load error for the caller to show a helpful message
         try {
           console.error('useGoogleSheetCarteira fetch error', err)

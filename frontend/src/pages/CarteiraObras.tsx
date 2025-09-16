@@ -258,7 +258,44 @@ export default function CarteiraObras() {
 	};
 
 	// Dados calculados
+
+	// Helpers seguros para leitura de campos dinâmicos vindos da planilha (evita uso direto de `any`)
+	const getFieldString = (obj: Record<string, unknown> | MatrizItem, key: string) => {
+		if (obj == null) return ''
+		if (!Object.prototype.hasOwnProperty.call(obj, key)) return ''
+		const v = (obj as Record<string, unknown>)[key]
+		if (v == null) return ''
+		return String(v).trim()
+	}
+	const getFieldNumber = (obj: Record<string, unknown> | MatrizItem, key: string) => {
+		if (obj == null) return 0
+		if (!Object.prototype.hasOwnProperty.call(obj, key)) return 0
+		const v = (obj as Record<string, unknown>)[key]
+		if (v == null) return 0
+		if (typeof v === 'number') return v
+		const s = String(v).replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')
+		const n = Number(parseFloat(s))
+		return Number.isNaN(n) ? 0 : n
+	}
+	const normalize = (s?: string) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
+	const groupByStatusFim = React.useCallback((rows: Array<Record<string, unknown> | MatrizItem>, agrupado: string) => {
+		const map = new Map<string, { value: number; pepSet: Set<string> }>()
+		for (const r of rows) {
+			const statusAgr = normalize(getFieldString(r, 'statusAgrupado'))
+			if (statusAgr !== normalize(agrupado)) continue
+			const key = getFieldString(r, 'statusFim') || '—'
+			const pep = getFieldString(r, 'pep') || `pep-${Math.random().toString(36).slice(2,8)}`
+			const cur = map.get(key) || { value: 0, pepSet: new Set<string>() }
+			cur.value = (cur.value || 0) + getFieldNumber(r, 'valor')
+			cur.pepSet.add(pep)
+			map.set(key, cur)
+		}
+		const out = Array.from(map.entries()).map(([name, obj]) => ({ name, qtd: obj.pepSet.size, value: Math.round(obj.value || 0) }))
+		return out.sort((a,b) => b.qtd - a.qtd)
+	}, [])
 	const filteredData = React.useMemo(() => {
+		try {
+			// original logic below
 		// Sinais de suporte de campos na matriz
 		const anyHasEner = rawRows.some(r => (r.statusEner || '').trim());
 		const anyHasConc = rawRows.some(r => (r.statusConc || '').trim());
@@ -396,50 +433,21 @@ export default function CarteiraObras() {
 			});
 		}
 
-		return {
-			statusENER,
-			statusCONC,
-			comparison,
-			reasons,
-			matrix: tableRows,
-		} as DashboardData;
+			return {
+				statusENER,
+				statusCONC,
+				comparison,
+				reasons,
+				matrix: tableRows,
+			} as DashboardData;
+		} catch (err) {
+			console.error('Erro ao calcular filteredData', err)
+			try { setRuntimeError(String(err || 'Erro desconhecido ao processar dados')) } catch (e) { console.debug('failed to set runtimeError', e) }
+			return { statusENER: [], statusCONC: [], comparison: [], reasons: [], matrix: [] } as DashboardData
+		}
 	}, [rawRows, selectedRegion, activeFilters, pepSearch, sortConfig, statusEnerMap, statusConcMap, reasonsMap]);
 
-	// Agrupamentos por STATUS FIM filtrando por STATUS AGRUPADO
-	// Helpers seguros para leitura de campos dinâmicos vindos da planilha (evita uso direto de `any`)
-	const getFieldString = (obj: Record<string, unknown> | MatrizItem, key: string) => {
-		if (obj == null) return ''
-		if (!Object.prototype.hasOwnProperty.call(obj, key)) return ''
-		const v = (obj as Record<string, unknown>)[key]
-		if (v == null) return ''
-		return String(v).trim()
-	}
-	const getFieldNumber = (obj: Record<string, unknown> | MatrizItem, key: string) => {
-		if (obj == null) return 0
-		if (!Object.prototype.hasOwnProperty.call(obj, key)) return 0
-		const v = (obj as Record<string, unknown>)[key]
-		if (v == null) return 0
-		if (typeof v === 'number') return v
-		const s = String(v).replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/g, '.')
-		const n = Number(parseFloat(s))
-		return Number.isNaN(n) ? 0 : n
-	}
-	const normalize = (s?: string) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
-	const groupByStatusFim = React.useCallback((rows: Array<Record<string, unknown> | MatrizItem>, agrupado: string) => {
-		const map = new Map<string, { value: number; pepSet: Set<string> }>()
-		for (const r of rows) {
-			const statusAgr = normalize(getFieldString(r, 'statusAgrupado'))
-			if (statusAgr !== normalize(agrupado)) continue
-			const key = getFieldString(r, 'statusFim') || '—'
-			const pep = getFieldString(r, 'pep') || `pep-${Math.random().toString(36).slice(2,8)}`
-			const cur = map.get(key) || { value: 0, pepSet: new Set<string>() }
-			cur.value = (cur.value || 0) + getFieldNumber(r, 'valor')
-			cur.pepSet.add(pep)
-			map.set(key, cur)
-		}
-		const out = Array.from(map.entries()).map(([name, obj]) => ({ name, qtd: obj.pepSet.size, value: Math.round(obj.value || 0) }))
-		return out.sort((a,b) => b.qtd - a.qtd)
-	}, [])
+	// (helpers moved above)
 
 	const emAndamentoData = React.useMemo(() => groupByStatusFim(rawRows, 'Em Andamento'), [rawRows, groupByStatusFim]);
 	const concluidasData = React.useMemo(() => groupByStatusFim(rawRows, 'Concluída'), [rawRows, groupByStatusFim]);
@@ -618,35 +626,42 @@ export default function CarteiraObras() {
 			}
 
 			// Se houve erro ao carregar direto da planilha, tentar rota backend específica 'carteira-obras' antes do fallback genérico
-			if (sheetLoadError) {
-				let cancelled = false
-				getCarteiraObras()
-					.then((res: { data?: MatrizItem[] }) => {
-						if (cancelled) return
-						const data = (res && res.data) || []
-						if (Array.isArray(data) && data.length) {
-							setRawRows(data as MatrizItem[])
-							try { showToast(`Carteira de Obras (backend) Carregado: ${data.length} linhas`); } catch (e) { console.debug(e) }
-						}
-					})
-					.catch((err: unknown) => {
-						console.error('Fallback backend carteira-obras failed', err)
-						// se falhou, tentar /matriz-dados/ como antes
-						getMatrizDados()
-							.then((res2: { data?: MatrizItem[] }) => {
-								const d2 = (res2 && res2.data) || []
-								if (Array.isArray(d2) && d2.length) {
-									setRawRows(d2 as MatrizItem[])
-									try { showToast(`Carteira de Obras (backend matriz-dados) Carregado: ${d2.length} linhas`); } catch (e) { console.debug(e) }
+				if (sheetLoadError) {
+					// tentar ambos endpoints backend em paralelo e pegar o primeiro com dados
+					let cancelled = false
+					Promise.allSettled([
+						getCarteiraObras(),
+						getMatrizDados(),
+					])
+						.then((results) => {
+							if (cancelled) return
+							for (const r of results) {
+								if (r.status === 'fulfilled') {
+									const val = (r as PromiseFulfilledResult<unknown>).value
+									let data: unknown[] = []
+									if (val && typeof val === 'object') {
+										const vObj = val as { data?: unknown }
+										if (Array.isArray(vObj.data)) data = vObj.data as unknown[]
+										else if (Array.isArray((val as unknown))) data = val as unknown[]
+									} else if (Array.isArray(val)) {
+										data = val as unknown[]
+									}
+									if (Array.isArray(data) && data.length) {
+										setRawRows(data as MatrizItem[])
+										try { showToast(`Carteira de Obras (backend) Carregado: ${data.length} linhas`); } catch (e) { console.debug(e) }
+										return
+									}
 								}
-							})
-							.catch((err2: unknown) => {
-								console.error('Fallback matriz-dados failed', err2)
-								try { showToast('Erro ao carregar dados do backend como fallback'); } catch (e) { console.debug(e) }
-							})
-					})
-				return () => { cancelled = true }
-			}
+							}
+							// se nenhum retornou dados
+							try { showToast('Erro ao carregar dados do backend como fallback'); } catch (e) { console.debug(e) }
+						})
+						.catch((err) => {
+							console.error('Erro ao tentar fallbacks backend', err)
+							try { showToast('Erro ao carregar dados do backend como fallback'); } catch (e) { console.debug(e) }
+						})
+					return () => { cancelled = true }
+				}
 			setStatusEnerMap(graficoEner || {})
 			setStatusConcMap(graficoConc || {})
 			setReasonsMap(graficoServico || {})
