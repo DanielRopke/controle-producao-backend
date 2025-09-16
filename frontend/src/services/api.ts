@@ -83,16 +83,27 @@ axios.interceptors.response.use(
   (error) => {
     const status = error?.response?.status
     if (status === 401) {
-      try {
-        localStorage.removeItem('jwt_access')
-        localStorage.removeItem('jwt_refresh')
-  } catch { /* ignore storage errors */ }
-      // Redireciona para login com flag de sessão expirada
-      if (typeof window !== 'undefined') {
-        const current = window.location.pathname + window.location.search
-        const qp = new URLSearchParams({ expired: '1', next: current })
-        window.location.assign(`/login?${qp.toString()}`)
-      }
+        // Só tratar 401s do backend da aplicação; ignorar 401s vindos de terceiros (ex: docs.google.com)
+        try {
+          const reqUrl = error?.config?.url ? String(error.config.url) : ''
+          const isBackendCall = reqUrl.startsWith(API_BASE) || reqUrl.startsWith('/api') || reqUrl.indexOf(API_BASE) >= 0
+          if (!isBackendCall) {
+            return Promise.reject(error)
+          }
+        } catch {
+              // se não conseguimos determinar, prosseguir com tratamento por segurança
+            }
+
+        try {
+          localStorage.removeItem('jwt_access')
+          localStorage.removeItem('jwt_refresh')
+        } catch { /* ignore storage errors */ }
+        // Redireciona para login com flag de sessão expirada
+        if (typeof window !== 'undefined') {
+          const current = window.location.pathname + window.location.search
+          const qp = new URLSearchParams({ expired: '1', next: current })
+          window.location.assign(`/login?${qp.toString()}`)
+        }
     }
     return Promise.reject(error)
   }
@@ -137,13 +148,14 @@ export const api = {
     const res = await axios.post(`${API_BASE}/auth/password-reset-confirm`, { uid, token, new_password })
     return res.data as { message: string }
   }
+  ,
+  checkEmail: async (email: string) => {
+    const res = await axios.post(`${API_BASE}/auth/check-email`, { email })
+    return res.data as { exists: boolean; is_active: boolean }
+  }
 }
 
 // Check email existence / status (used by Cadastro to decide button label)
-;(api as any).checkEmail = async (email: string) => {
-  const res = await axios.post(`${API_BASE}/auth/check-email`, { email })
-  return res.data as { exists: boolean; is_active: boolean }
-}
 
 // ------------------ Agregação para Dashboard ------------------
 export async function loadDashboardData(filters: BaseFilters | ExtendedFilters = {}): Promise<DashboardAggregated> {
