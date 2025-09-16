@@ -286,7 +286,8 @@ export default function CarteiraObras() {
 			const key = getFieldString(r, 'statusFim') || '—'
 			const pep = getFieldString(r, 'pep') || `pep-${Math.random().toString(36).slice(2,8)}`
 			const cur = map.get(key) || { value: 0, pepSet: new Set<string>() }
-			cur.value = (cur.value || 0) + getFieldNumber(r, 'valor')
+			const v = getFieldNumber(r, 'valor')
+			cur.value = (cur.value || 0) + (Number.isFinite(v) ? v : 0)
 			cur.pepSet.add(pep)
 			map.set(key, cur)
 		}
@@ -301,7 +302,7 @@ export default function CarteiraObras() {
 		const anyHasConc = rawRows.some(r => (r.statusConc || '').trim());
 		const anyHasMotivos = rawRows.some(r => (r.statusServico || '').trim());
 
-		// 1) Base de linhas para OUTROS gráficos e TABELA: respeita comparação e região
+	// 1) Base de linhas para OUTROS gráficos e TABELA: respeita comparação e região
 		const regionFilterForOthers = (activeFilters.comparison || (selectedRegion !== 'all' ? selectedRegion : undefined)) as string | undefined;
 		let rowsForOthers = rawRows;
 				if (regionFilterForOthers) rowsForOthers = rowsForOthers.filter(r => (r.seccional || '').trim() === regionFilterForOthers);
@@ -338,11 +339,91 @@ export default function CarteiraObras() {
 				}
 		if (pepSearch.trim()) rowsForOthers = rowsForOthers.filter(r => (r.pep || '').toLowerCase().includes(pepSearch.toLowerCase()));
 
+				// Aplicar filtros de Status SAP, Tipo, Mês e Faixa de Datas
+				if (selectedStatusSap) rowsForOthers = rowsForOthers.filter(r => (r.statusSap || '').trim() === selectedStatusSap);
+				if (selectedTipo) rowsForOthers = rowsForOthers.filter(r => (r.tipo || '').trim() === selectedTipo);
+				if (selectedMes) {
+					rowsForOthers = rowsForOthers.filter(r => {
+						const v = String(r.dataConclusao || r.prazo || '');
+						const mo = v.match(/\/(\d{1,2})\/(\d{4})$/);
+						const month = mo ? mo[1] : '';
+						return month === selectedMes;
+					});
+				}
+				if (selectedStartDate || selectedEndDate) {
+					const toDate = (s: string): number => {
+						const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+						if (m) {
+							const d = Number(m[1]);
+							const mo = Number(m[2]) - 1;
+							const y = Number(m[3]);
+							return new Date(y, mo, d).getTime();
+						}
+						const t = Date.parse(s);
+						return Number.isNaN(t) ? Number.NaN : t;
+					};
+					const startTs = selectedStartDate ? new Date(selectedStartDate.getFullYear(), selectedStartDate.getMonth(), selectedStartDate.getDate()).getTime() : Number.NaN;
+					const endTs = selectedEndDate ? new Date(selectedEndDate.getFullYear(), selectedEndDate.getMonth(), selectedEndDate.getDate()).getTime() : Number.NaN;
+					rowsForOthers = rowsForOthers.filter(r => {
+						const dates: number[] = [];
+						const dl = String(r.prazo || '').trim();
+						const dp = String(r.dataConclusao || '').trim();
+						if (dl) dates.push(toDate(dl));
+						if (dp) dates.push(toDate(dp));
+						if (!dates.length) return false; // sem data, fora do intervalo
+						return dates.some(ts => {
+							const okStart = Number.isNaN(startTs) || ts >= startTs;
+							const okEnd = Number.isNaN(endTs) || ts <= endTs;
+							return okStart && okEnd;
+						});
+					});
+				}
+
 		// 2) Base de linhas para COMPARATIVO: NÃO aplicar filtro de comparação nem selectedRegion, apenas demais filtros
-		let rowsForComparison = rawRows;
+				let rowsForComparison = rawRows;
 		if (activeFilters.statusENER && anyHasEner) rowsForComparison = rowsForComparison.filter(r => (r.statusEner || '').trim() === activeFilters.statusENER);
 		if (activeFilters.statusCONC && anyHasConc) rowsForComparison = rowsForComparison.filter(r => (r.statusConc || '').trim() === activeFilters.statusCONC);
 		if (activeFilters.reasons && anyHasMotivos) rowsForComparison = rowsForComparison.filter(r => (r.statusServico || '').trim() === activeFilters.reasons);
+
+				// Aplicar também os filtros globais aos dados de comparação (exceto região/comparativo)
+				if (selectedStatusSap) rowsForComparison = rowsForComparison.filter(r => (r.statusSap || '').trim() === selectedStatusSap);
+				if (selectedTipo) rowsForComparison = rowsForComparison.filter(r => (r.tipo || '').trim() === selectedTipo);
+				if (selectedMes) {
+					rowsForComparison = rowsForComparison.filter(r => {
+						const v = String(r.dataConclusao || r.prazo || '');
+						const mo = v.match(/\/(\d{1,2})\/(\d{4})$/);
+						const month = mo ? mo[1] : '';
+						return month === selectedMes;
+					});
+				}
+				if (selectedStartDate || selectedEndDate) {
+					const toDate = (s: string): number => {
+						const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+						if (m) {
+							const d = Number(m[1]);
+							const mo = Number(m[2]) - 1;
+							const y = Number(m[3]);
+							return new Date(y, mo, d).getTime();
+						}
+						const t = Date.parse(s);
+						return Number.isNaN(t) ? Number.NaN : t;
+					};
+					const startTs = selectedStartDate ? new Date(selectedStartDate.getFullYear(), selectedStartDate.getMonth(), selectedStartDate.getDate()).getTime() : Number.NaN;
+					const endTs = selectedEndDate ? new Date(selectedEndDate.getFullYear(), selectedEndDate.getMonth(), selectedEndDate.getDate()).getTime() : Number.NaN;
+					rowsForComparison = rowsForComparison.filter(r => {
+						const dates: number[] = [];
+						const dl = String(r.prazo || '').trim();
+						const dp = String(r.dataConclusao || '').trim();
+						if (dl) dates.push(toDate(dl));
+						if (dp) dates.push(toDate(dp));
+						if (!dates.length) return false;
+						return dates.some(ts => {
+							const okStart = Number.isNaN(startTs) || ts >= startTs;
+							const okEnd = Number.isNaN(endTs) || ts <= endTs;
+							return okStart && okEnd;
+						});
+					});
+				}
 
 		// 2) Agregações serão feitas inline abaixo
 
@@ -445,7 +526,7 @@ export default function CarteiraObras() {
 			try { setRuntimeError(String(err || 'Erro desconhecido ao processar dados')) } catch (e) { console.debug('failed to set runtimeError', e) }
 			return { statusENER: [], statusCONC: [], comparison: [], reasons: [], matrix: [] } as DashboardData
 		}
-	}, [rawRows, selectedRegion, activeFilters, pepSearch, sortConfig, statusEnerMap, statusConcMap, reasonsMap]);
+	}, [rawRows, selectedRegion, activeFilters, pepSearch, sortConfig, statusEnerMap, statusConcMap, reasonsMap, selectedStatusSap, selectedTipo, selectedMes, selectedStartDate, selectedEndDate]);
 
 	// (helpers moved above)
 

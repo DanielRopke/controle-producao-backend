@@ -113,15 +113,17 @@ export default function useGoogleSheetCarteira(sheetId: string, sheetName = 'Car
 
         const mapped: MatrizRow[] = rows.map((r) => ({
           pep: String(r.PEP || r.pep || r.PEP_ || r['Pep'] || r.pep || '') || undefined,
-          prazo: String(r.Prazo || r.prazo || r.PRAZO || '') || undefined,
-          dataConclusao: String(r['Data Conclusão'] || r.dataConclusao || r.data || '') || undefined,
+          // 'Data limite' é o cabeçalho oficial; manter fallbacks para compatibilidade
+          prazo: String(r['Data limite'] || r['DATA LIMITE'] || r.Prazo || r.prazo || r.PRAZO || '') || undefined,
+          // 'data prog/conc' é o cabeçalho oficial; manter fallbacks
+          dataConclusao: String(r['data prog/conc'] || r['Data prog/conc'] || r['DATA PROG/CONC'] || r['Data Conclusão'] || r.dataConclusao || r.data || '') || undefined,
           municipio: String(r.Municipio || r.municipio || r['MUNICIPIO'] || r['Município'] || '') || undefined,
-          statusSap: String(r['Status SAP'] || r.statusSap || r.status || '') || undefined,
+          statusSap: String(r['STATUS SAP'] || r['Status SAP'] || r.statusSap || r.status || '') || undefined,
           statusFim: String(r['STATUS FIM'] || r['Status Fim'] || r.statusFim || r['Status FIM'] || r['Status fim'] || '') || undefined,
           statusAgrupado: String(r['STATUS AGRUPADO'] || r['Status Agrupado'] || r.statusAgrupado || r['Status agrupado'] || '') || undefined,
-          valor: parseNumber(r.Valor || r.valor || r.RS || r.rs || r['Valor (R$)'] || r['R$'] || 0),
-          seccional: String(r.Seccional || r.seccional || r.Seccao || r.seccao || '') || undefined,
-          tipo: String(r.Tipo || r.tipo || '') || undefined,
+          valor: parseNumber(r['R$'] || r.Valor || r.valor || r.RS || r.rs || r['Valor (R$)'] || 0),
+          seccional: String(r.SECCIONAL || r.Seccional || r.seccional || r.Seccao || r.seccao || '') || undefined,
+          tipo: String(r.TIPO || r.Tipo || r.tipo || '') || undefined,
           statusEner: String(r.statusEner || r['Status ENER'] || '') || undefined,
           statusConc: String(r.statusConc || r['Status CONC'] || '') || undefined,
           statusServico: String(r.statusServico || r['Motivo'] || r.motivo || '') || undefined,
