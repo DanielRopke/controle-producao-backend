@@ -570,7 +570,7 @@ export default function CarteiraObras() {
 		useEffect(() => {
 			if (Array.isArray(sheetMatriz) && sheetMatriz.length) {
 				setRawRows(sheetMatriz as MatrizItem[])
-				try { showToast(`CarteiraObras: ${sheetMatriz.length} linhas carregadas`); } catch (e) { console.debug('toast:', e) }
+				try { showToast(`Carteira de Obras Carregado: ${sheetMatriz.length} linhas`); } catch (e) { console.debug('toast:', e) }
 			}
 			setStatusEnerMap(graficoEner || {})
 			setStatusConcMap(graficoConc || {})
