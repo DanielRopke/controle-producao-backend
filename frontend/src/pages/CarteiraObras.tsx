@@ -15,7 +15,7 @@ import { PEPSearch } from '../components/PEPSearch';
 import { cn } from "../lib/utils";
 import useGoogleSheetCarteira from '../hooks/useGoogleSheetCarteira';
 import type { MatrizItem } from '../services/api';
-import { getMatrizDados } from '../services/api';
+import { getMatrizDados, getCarteiraObras } from '../services/api';
 import { showToast } from '../components/toast';
 import LogoSetup from '../assets/LogoSetup1.png';
 import { FundoAnimado } from '../components/FundoAnimado';
@@ -85,6 +85,29 @@ export default function CarteiraObras() {
 		document.title = 'Carteira de Obras';
 		return () => {
 			document.title = prevTitle;
+		};
+	}, []);
+
+	// Global error handlers to surface runtime exceptions as toasts (ajuda debug em produção)
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const onError = (ev: ErrorEvent) => {
+			try {
+				console.error('Global error captured in CarteiraObras', ev.error || ev.message, ev);
+				showToast(`Erro na página Carteira de Obras: ${String(ev.message || ev.error || 'ver console')}`);
+			} catch (e) { console.debug('failed to report global error', e) }
+		};
+		const onRejection = (ev: PromiseRejectionEvent) => {
+			try {
+				console.error('Unhandled rejection in CarteiraObras', ev.reason);
+				showToast(`Erro não tratado: ${String(ev.reason?.message || ev.reason || 'ver console')}`);
+			} catch (e) { console.debug('failed to report rejection', e) }
+		};
+		window.addEventListener('error', onError as EventListener);
+		window.addEventListener('unhandledrejection', onRejection as EventListener);
+		return () => {
+			window.removeEventListener('error', onError as EventListener);
+			window.removeEventListener('unhandledrejection', onRejection as EventListener);
 		};
 	}, []);
 
@@ -589,26 +612,26 @@ export default function CarteiraObras() {
 			if (sheetLoadError) {
 				let cancelled = false
 				getCarteiraObras()
-					.then((res) => {
+					.then((res: { data?: MatrizItem[] }) => {
 						if (cancelled) return
-						const data = (res && (res as { data?: MatrizItem[] }).data) || []
+						const data = (res && res.data) || []
 						if (Array.isArray(data) && data.length) {
 							setRawRows(data as MatrizItem[])
 							try { showToast(`Carteira de Obras (backend) Carregado: ${data.length} linhas`); } catch (e) { console.debug(e) }
 						}
 					})
-					.catch((err) => {
+					.catch((err: unknown) => {
 						console.error('Fallback backend carteira-obras failed', err)
 						// se falhou, tentar /matriz-dados/ como antes
 						getMatrizDados()
-							.then((res2) => {
-								const d2 = (res2 && (res2 as { data?: MatrizItem[] }).data) || []
+							.then((res2: { data?: MatrizItem[] }) => {
+								const d2 = (res2 && res2.data) || []
 								if (Array.isArray(d2) && d2.length) {
 									setRawRows(d2 as MatrizItem[])
 									try { showToast(`Carteira de Obras (backend matriz-dados) Carregado: ${d2.length} linhas`); } catch (e) { console.debug(e) }
 								}
 							})
-							.catch((err2) => {
+							.catch((err2: unknown) => {
 								console.error('Fallback matriz-dados failed', err2)
 								try { showToast('Erro ao carregar dados do backend como fallback'); } catch (e) { console.debug(e) }
 							})
@@ -631,12 +654,21 @@ export default function CarteiraObras() {
 			const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true, allowTaint: true });
 			canvas.toBlob((blob) => {
 				if (blob) {
-					const item = new ClipboardItem({ 'image/png': blob });
-					navigator.clipboard.write([item]).then(() => {
-						showToast(`Imagem do gráfico ${chartName} copiada!`);
-					}).catch(() => {
-						showToast(`Erro ao copiar imagem do gráfico ${chartName}`);
-					});
+							try {
+								if (typeof (window as any).ClipboardItem !== 'function') {
+									showToast('API ClipboardImage não suportada neste navegador');
+									return;
+								}
+								const item = new (window as any).ClipboardItem({ 'image/png': blob });
+								navigator.clipboard.write([item]).then(() => {
+									showToast(`Imagem do gráfico ${chartName} copiada!`);
+								}).catch(() => {
+									showToast(`Erro ao copiar imagem do gráfico ${chartName}`);
+								});
+							} catch (e) {
+								console.error('Erro ao tentar copiar imagem para clipboard', e)
+								showToast(`Erro ao copiar imagem do gráfico ${chartName}`);
+							}
 				}
 			});
 		} catch (error) {
